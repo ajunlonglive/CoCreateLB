@@ -9,7 +9,7 @@ module.exports = {
     sources: [{
             path: "./docs/index.html",
             collection: "files",
-            document_id: "",
+            document_id: "602883181f779c6db5843733",
             key: "html",
             data:{
                 name: "Loadbalancer Doc",
@@ -19,10 +19,10 @@ module.exports = {
    
     crud: [{
             collection: "routes",
-            document_id: "",
+            document_id: "602883181f779c6db5843732",
             data:{
                 collection: "files",
-                document_id: "",
+                document_id: "602883181f779c6db5843733",
                 name: "html",
                 domains: ["cocreate.app", "server.cocreate.app", "ws.cocreate.app"],
                 route: "/docs/loadbalancer",

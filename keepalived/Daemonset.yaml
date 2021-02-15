@@ -26,6 +26,6 @@ spec:
           volumeMounts:
             - name: config-volume
               mountPath: /tmp/config/
-#      nodeSelector:
-#        run-ingress: "true"
+      nodeSelector:
+        run-ingress: "true"
 #        nodeName: "kamal"

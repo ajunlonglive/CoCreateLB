@@ -22,7 +22,7 @@ data:
     }
     vrrp_instance k8s-vips {
         state BACKUP
-        interface enp0s3
+        interface eth0
         virtual_router_id 22
         priority {{NODE_PRIORITY}}
         advert_int 1
@@ -36,7 +36,7 @@ data:
             auth_pass d0ck3r
         }
         virtual_ipaddress {
-            3.93.2.0/24 dev enp0s3
+            3.93.2.0/24 dev eth0
         }
         smtp_alert
     }

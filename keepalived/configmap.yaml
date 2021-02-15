@@ -1,0 +1,45 @@
+apiVersion: v1
+data:
+  keepalived.conf: |-
+    global_defs {
+        script_user root
+        enable_script_security
+        router_id {{ROUTER_ID}}
+        vrrp_garp_master_delay 1
+        vrrp_garp_master_refresh 30
+        notification_email {
+           keepalived@example.com
+        }
+        notification_email_from keepalived@example.com
+        smtp_server x.x.x.x
+    }
+    vrrp_script chk_port {
+        script "curl http://127.0.0.1/healthz"
+        timeout 3
+        interval 2
+        fall 2
+        rise 2
+    }
+    vrrp_instance k8s-vips {
+        state BACKUP
+        interface enp0s3
+        virtual_router_id 22
+        priority {{NODE_PRIORITY}}
+        advert_int 1
+        nopreempt
+        dont_track_primary
+        track_script {
+            chk_port
+        }
+        authentication {
+            auth_type PASS
+            auth_pass d0ck3r
+        }
+        virtual_ipaddress {
+            3.93.2.0/24 dev enp0s3
+        }
+        smtp_alert
+    }
+kind: ConfigMap
+metadata:
+  name: keepalived-conf

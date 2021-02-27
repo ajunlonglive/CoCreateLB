@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  labels:
+    run: haproxy
+  name: haproxy
+spec:
+  selector:
+    matchLabels:
+      run: haproxy
+  template:
+    metadata:
+      labels:
+        run: haproxy
+    spec:
+      containers:
+        - name: haproxy
+          image: haproxytech/haproxy-alpine
+          ports:
+            - name: http
+              containerPort: 80
+            - name: https
+              containerPort: 443
+            - name: stat
+              containerPort: 1936
+      nodeSelector:
+        nodeType: loadbalancer

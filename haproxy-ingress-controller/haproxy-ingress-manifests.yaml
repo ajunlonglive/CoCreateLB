@@ -1,0 +1,237 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-haproxy
+spec: {}
+status: {}
+---
+---
+apiVersion: v1
+data:
+  "80": ingress-nginx/ingress-nginx:80
+  "443": ingress-nginx/ingress-nginx:443
+kind: ConfigMap
+metadata:
+  creationTimestamp: null
+  name: tcp-services
+  namespace: ingress-haproxy
+---
+---
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: ingress-nginx
+  name: ingress-nginx
+  namespace: ingress-nginx
+spec:
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: 80
+  - name: https
+    port: 443
+    protocol: TCP
+    targetPort: 443
+  selector:
+    # ensure the right label is used
+    app: ingress-nginx
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+---
+# Source: kubernetes-ingress/templates/controller-serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: haproxy-ingress-kubernetes-ingress
+  namespace: ingress-haproxy
+  labels:
+    app.kubernetes.io/name: kubernetes-ingress
+    helm.sh/chart: kubernetes-ingress-1.12.1
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: haproxy-ingress
+    app.kubernetes.io/version: 1.5.1
+---
+# Source: kubernetes-ingress/templates/controller-configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: haproxy-ingress-kubernetes-ingress
+  namespace: ingress-haproxy
+  labels:
+    app.kubernetes.io/name: kubernetes-ingress
+    helm.sh/chart: kubernetes-ingress-1.12.1
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: haproxy-ingress
+    app.kubernetes.io/version: 1.5.1
+data:
+  syslog-server: address:stdout, facility:daemon,
+---
+# Source: kubernetes-ingress/templates/clusterrole.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: haproxy-ingress-kubernetes-ingress
+  labels:
+    app.kubernetes.io/name: kubernetes-ingress
+    helm.sh/chart: kubernetes-ingress-1.12.1
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: haproxy-ingress
+    app.kubernetes.io/version: 1.5.1
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - configmaps
+  - endpoints
+  - services
+  - namespaces
+  - events
+  - secrets
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "extensions"
+  - "networking.k8s.io"
+  resources:
+  - ingresses
+  - ingresses/status
+  - ingressclasses
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - "extensions"
+  - "networking.k8s.io"
+  resources:
+  - ingresses/status
+  verbs:
+  - update
+---
+# Source: kubernetes-ingress/templates/clusterrolebinding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: haproxy-ingress-kubernetes-ingress
+  labels:
+    app.kubernetes.io/name: kubernetes-ingress
+    helm.sh/chart: kubernetes-ingress-1.12.1
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: haproxy-ingress
+    app.kubernetes.io/version: 1.5.1
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: haproxy-ingress-kubernetes-ingress
+subjects:
+- kind: ServiceAccount
+  name: haproxy-ingress-kubernetes-ingress
+  namespace: ingress-haproxy
+---
+# Source: kubernetes-ingress/templates/controller-daemonset.yaml
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: haproxy-ingress-kubernetes-ingress
+  namespace: ingress-haproxy
+  labels:
+    app.kubernetes.io/name: kubernetes-ingress
+    helm.sh/chart: kubernetes-ingress-1.12.1
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/instance: haproxy-ingress
+    app.kubernetes.io/version: 1.5.1
+spec:
+  minReadySeconds: 0
+  updateStrategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kubernetes-ingress
+      app.kubernetes.io/instance: haproxy-ingress
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: kubernetes-ingress
+        app.kubernetes.io/instance: haproxy-ingress
+    spec:
+      serviceAccountName: haproxy-ingress-kubernetes-ingress
+      terminationGracePeriodSeconds: 300
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
+      priorityClassName: system-cluster-critical
+      containers:
+        - name: kubernetes-ingress-controller
+          image: "haproxytech/kubernetes-ingress:1.5.1"
+          imagePullPolicy: IfNotPresent
+          args:
+          - --configmap=ingress-haproxy/haproxy-ingress-kubernetes-ingress
+          - --ingress.class=haproxy
+          - --log=info
+          - --configmap-tcp-services=ingress-haproxy/tcp-services
+          - --disable-http
+          - --disable-https
+          ports:
+            - name: http
+              containerPort: 80
+              protocol: TCP
+            - name: https
+              containerPort: 443
+              protocol: TCP
+            - name: stat
+              containerPort: 1024
+              protocol: TCP
+          livenessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 1042
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /healthz
+              port: 1042
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 1
+          startupProbe:
+            failureThreshold: 20
+            httpGet:
+              path: /healthz
+              port: 1042
+              scheme: HTTP
+            initialDelaySeconds: 0
+            periodSeconds: 1
+            successThreshold: 1
+            timeoutSeconds: 1
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+      nodeSelector:
+        nodeType: loadbalancer

@@ -1,0 +1,30 @@
+name: Deploy to Kubernetes
+
+on:
+  push:
+    paths:
+      - manifests/haproxy-ingress-manifests.yaml
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v1
+
+    - name: Get kubectl
+      run: |
+        curl -LO https://dl.k8s.io/release/v1.20.0/bin/linux/amd64/kubectl
+        chmod +x kubectl
+
+    - name: Save kubeconfig
+      env:
+        KUBECONFIG_FILE: ${{ secrets.KUBECONFIG }}
+        KUBECONFIG: ~/.kube/config
+
+      run: |
+        echo ${KUBECONFIG_FILE} > ${KUBECONFIG}
+
+    - name: Run kubectl
+      run: |
+        ./kubectl apply manifests/haproxy-ingress-manifests.yaml

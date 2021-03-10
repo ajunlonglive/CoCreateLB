@@ -154,8 +154,8 @@ func setKlogFlags() {
 
 func setConfigFlags() {
 	rootCmd.PersistentFlags().StringVar(&CfgFile, "config", CfgFile, "Path to config file")
-	rootCmd.PersistentFlags().StringVar(&mainConfig.MetricSource, "metric-source",
-		mainConfig.MetricSource, fmt.Sprintf("Type of metric source, support %s", ms.SupportSourceType()))
+	rootCmd.PersistentFlags().StringVar((*string)(&mainConfig.MetricSource), "metric-source",
+		string(mainConfig.MetricSource), fmt.Sprintf("Type of metric source, support %s", ms.SupportSourceType()))
 	rootCmd.PersistentFlags().StringVar(&mainConfig.KubeConfigFile, "kubeconfig", "", "Path to a kubeconfig file, use in-cluster config if empty")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.LabelSelector, "label-selector", mainConfig.LabelSelector, "A list of \"label_name=label_value\" "+
 		"separated by comma. Nodes with exactly matching label set are watched by autoscaler. All nodes are processed if set to empty")
@@ -180,7 +180,7 @@ func setConfigFlags() {
 		"After how long in seconds a scaling up time out")
 	rootCmd.PersistentFlags().IntVar(&mainConfig.MaxBackendFailure, "max-backend-failure", mainConfig.MaxBackendFailure,
 		"Maximum times of allowed provisioning failure in backend. "+"Only failures of scaling up are counted")
-	rootCmd.PersistentFlags().StringVar(&mainConfig.BackendProvsioner, "backend-provisioner", mainConfig.BackendProvsioner,
+	rootCmd.PersistentFlags().StringVar((*string)(&mainConfig.BackendProvsioner), "backend-provisioner", string(mainConfig.BackendProvsioner),
 		fmt.Sprintf("Type of backend provisioner provisioning nodes, support: %s", provisioner.SupportProvisionerType()))
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherURL, "rancher-url", mainConfig.RancherURL, "URL of Rancher to access if use Rancher as backend provisioner")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherToken, "rancher-token", mainConfig.RancherToken,
@@ -190,5 +190,6 @@ func setConfigFlags() {
 			"and match the label-selector. It's better to set related node labels at node pool level")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherCA, "rancher-ca", mainConfig.RancherCA, "Path to a CA to verify Rancher server, "+
 		"insecure connection will be used if set to empty")
+	rootCmd.PersistentFlags().IntVar(&mainConfig.MinNodeNum, "min-node-num", mainConfig.MinNodeNum, "Minimum number of available node is required")
 
 }

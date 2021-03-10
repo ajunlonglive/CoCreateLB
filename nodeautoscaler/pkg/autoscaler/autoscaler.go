@@ -109,8 +109,19 @@ func NewAutoScaler(ctx context.Context, cfg config.Config) (*AutoScaler, error) 
 		return nil, err
 	}
 
+	calcCfg := mcalc.InternalConfig{
+		MaxBackendFailure:      cfg.MaxBackendFailure,
+		ScaleDownThreshold:     cfg.ScaleDownThreshold,
+		ScaleUpThreshold:       cfg.ScaleUpThreshold,
+		AlarmWindow:            cfg.AlarmWindow,
+		AlarmCoolDown:          cfg.AlarmCoolDown,
+		AlarmCancelWindow:      cfg.AlarmCancelWindow,
+		MetricsCalculatePeriod: cfg.MetricsCalculatePeriod,
+		ScaleUpTimeout:         cfg.ScaleUpTimeout,
+		MinNodeNum:             cfg.MinNodeNum,
+	}
 	as.calculator, err = mcalc.NewCalculator(lowerCtx, as.reverseCloseCh, as.availNodes, &(as.rwlock),
-		as.metricSource, as.provisioner, cfg)
+		as.metricSource, as.provisioner, calcCfg)
 	if err != nil {
 		logger.Error(err, "failed to create metric calculator")
 		return nil, err
@@ -171,6 +182,7 @@ func (a *AutoScaler) updateAvailNodes(key string) error {
 
 	var addNode, delNode bool
 	var nodeObj *v1.Node
+	var ok bool
 
 	obj, exists, err := a.kubeNodeController.GetByKey(key)
 	if err != nil {
@@ -183,7 +195,7 @@ func (a *AutoScaler) updateAvailNodes(key string) error {
 		_, delNode = a.ifUpdateNodes(false, key)
 		addNode = false
 	} else {
-		nodeObj, ok := obj.(*v1.Node)
+		nodeObj, ok = obj.(*v1.Node)
 		if !ok {
 			err := fmt.Errorf("returned object is not a node")
 			logger.Error(err, err.Error(), "node key")
@@ -208,6 +220,9 @@ func (a *AutoScaler) updateAvailNodes(key string) error {
 	}
 	if addNode {
 		logger.Info("add new avaialbe node into metrics calculation", "node key", key)
+		if nodeObj == nil {
+			logger.Error(fmt.Errorf("node object is empty"), "")
+		}
 		a.availNodes[key] = nodeObj
 	}
 
@@ -250,7 +265,7 @@ func isNodeReady(obj *v1.Node) bool {
 
 func createMetricSource(ctx context.Context, cfg config.Config) (ms.MetricSource, error) {
 	switch cfg.MetricSource {
-	case string(ms.MetricSourceKube):
+	case ms.MetricSourceKube:
 		restCfg, err := util.CreateRestCfg(cfg.KubeConfigFile)
 		if err != nil {
 			return nil, err
@@ -267,7 +282,7 @@ func createMetricSource(ctx context.Context, cfg config.Config) (ms.MetricSource
 
 func createProvisioner(cfg config.Config) (pv.Provisioner, error) {
 	switch cfg.BackendProvsioner {
-	case string(pv.ProvisionerRancherNodePool):
+	case pv.ProvisionerRancherNodePool:
 		proCfg := pv.InternalConfig{
 			RancherURL:        cfg.RancherURL,
 			RancherToken:      cfg.RancherToken,

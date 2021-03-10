@@ -30,7 +30,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/config"
 	ms "github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/metricsource"
 	pv "github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/provisioner"
 
@@ -47,6 +46,38 @@ const (
 var checkPeriodBackoffFactor float32 = 1.2
 
 var logger = klogr.New().WithName("metric-calculator")
+
+// InternalConfig is a internally used configuration
+// this makes it no need to import config package, solving looping import
+type InternalConfig struct {
+	// MaxBackendFailure is the maximum times of allowed provisioning failure in backend
+	// only failures of scaling up are counted
+	MaxBackendFailure int
+
+	// ScaleDownThreshold indicates threshold below which scaling down might be triggered
+	ScaleDownThreshold string
+
+	// ScaleUpThreshold indicates threshold over which scaling up might be triggered
+	ScaleUpThreshold string
+
+	// AlarmWindow indicates for how long before a scale event is finally fired since it's firstly observed
+	AlarmWindow int32
+
+	// AlarmCoolDown is the minimum waiting time between 2 scaling
+	AlarmCoolDown int32
+
+	// AlarmCancelWindow denotes for how long metrics keep normal before a potential scale event is canceled
+	AlarmCancelWindow int32
+
+	// MetricsCalculatePeriod is the period metrics are calculated in
+	MetricsCalculatePeriod int
+
+	// ScaleUpTimeout denotes after how long in seconds a scaling up time out
+	ScaleUpTimeout int32
+
+	// MinNodeNum is the minimum number of available nodes required
+	MinNodeNum int
+}
 
 // Calculator to calculate metrics and triggers scaling action
 type Calculator struct {
@@ -100,12 +131,14 @@ type Calculator struct {
 
 	// backend provisioner
 	provisioner pv.Provisioner
+
+	minNodeNum int
 }
 
 // NewCalculator creates a calculator instance
 func NewCalculator(ctx context.Context, closeCh chan struct{}, availNodes map[string]*v1.Node,
 	rwl *sync.RWMutex, metricSource ms.MetricSource,
-	p pv.Provisioner, cfg config.Config) (*Calculator, error) {
+	p pv.Provisioner, cfg InternalConfig) (*Calculator, error) {
 	ret := Calculator{
 		availNodes:        availNodes,
 		rwlock:            rwl,
@@ -114,6 +147,7 @@ func NewCalculator(ctx context.Context, closeCh chan struct{}, availNodes map[st
 		context:           ctx,
 		upperCloseCh:      closeCh,
 		provisioner:       p,
+		minNodeNum:        cfg.MinNodeNum,
 	}
 
 	sdth, err := parseThreshold(cfg.ScaleDownThreshold)
@@ -227,6 +261,11 @@ func (c *Calculator) calc() (avgCPUUtil, avgMemUtil float32, effNodeNum int) {
 }
 
 func (c *Calculator) judgeEventType(cpuUtil, memUtil float32, nodeNum int) ScaleT {
+	// always scale up if available nodes is not enough
+	if c.lastNodeNum < c.minNodeNum {
+		return scaleUp
+	}
+
 	// either cpu or memory is overused, a scaling up might be needed
 	if th, ok := c.thresholds[scaleUp][ms.MetricNodeCPU]; ok {
 		if cpuUtil >= th {
@@ -251,8 +290,8 @@ func (c *Calculator) judgeEventType(cpuUtil, memUtil float32, nodeNum int) Scale
 		}
 	}
 
-	// if only one node is effective, never scale down
-	if nodeNum == 1 {
+	// if only minimum nodes are effective, never scale down
+	if nodeNum == c.minNodeNum {
 		return noScale
 	}
 
@@ -303,35 +342,36 @@ func (c *Calculator) updateEvent(cpuUtil, memUtil float32, nodeNum int) {
 
 // we only wait for scale up, and died if too many scaling up time out or fail
 func (c *Calculator) waitForScaleUp() bool {
-	var stop bool
+	stopCh := make(chan struct{})
 	var curLen int
-	var ticker *time.Ticker
-	checkInterval := scaleUpCheckPeriod
+	ticker := time.NewTicker(scaleUpCheckPeriod)
+	defer ticker.Stop()
 	f := func() {
 		c.rwlock.RLock()
 		defer c.rwlock.RUnlock()
 		curLen = len(c.availNodes)
 		if curLen > c.lastNodeNum {
-			stop = true
+			close(stopCh)
 		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.TODO(), c.scaleUpTimeout)
 	defer cancel()
-
-	for !stop {
-		ticker = time.NewTicker(checkInterval)
+	for {
 		f()
 
 		select {
 		case <-c.context.Done():
+			close(stopCh)
 			return false
 		case <-ticker.C:
+		case <-stopCh:
+			return false
 		case <-ctx.Done():
+			close(stopCh)
 			return true
 		}
 	}
-	return false
 }
 
 func (c *Calculator) fire(s ScaleT) {
@@ -339,6 +379,7 @@ func (c *Calculator) fire(s ScaleT) {
 	// only care about scale up
 	if s == scaleUp {
 		c.provisioner.ScaleUp()
+		logger.Info("waiting for scaling up")
 		if c.waitForScaleUp() {
 			c.backendFailureNum = c.backendFailureNum + 1
 			logger.Error(fmt.Errorf("waiting for scaling up timed out"),

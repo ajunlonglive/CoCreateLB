@@ -21,10 +21,20 @@
 
 package config
 
+import (
+	ms "github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/metricsource"
+	pv "github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/provisioner"
+)
+
+const (
+	defaultMetricSource ms.MetricSourceT = ms.MetricSourceKube
+	defaultProvisioner  pv.ProvisionerT  = pv.ProvisionerRancherNodePool
+)
+
 // Config presents configuration needed
 type Config struct {
 	// MetricSource indicates the source where metrics are read
-	MetricSource string
+	MetricSource ms.MetricSourceT
 
 	// KubeConfigFile is the path to a kubeconfig file
 	// If this is empty, in-cluster config is used
@@ -82,7 +92,7 @@ type Config struct {
 	MetricCacheExpireTime int
 
 	// BackendProvsioner indicates the type of backend used to provision nodes
-	BackendProvsioner string
+	BackendProvsioner pv.ProvisionerT
 
 	// RancherUrl is the url of Rancher
 	RancherURL string
@@ -99,6 +109,9 @@ type Config struct {
 	// RancherCA is the path to a CA to validate Rancher server
 	// Insecure connection is used if this is empty
 	RancherCA string
+
+	// MinNodeNum denotes at least how many available nodes are required
+	MinNodeNum int
 }
 
 // NewConfig returns an empty configuration
@@ -110,7 +123,7 @@ func NewConfig() Config {
 // Default set default values to configuration
 // Do not use klogr here as klogr is not initialized yet
 func Default(cfg *Config) {
-	cfg.MetricSource = "kubernetes"
+	cfg.MetricSource = defaultMetricSource
 	cfg.LabelSelector = ""
 	cfg.LeaseLockName = "node-autoscaler"
 	cfg.LeaseLockNamespace = "node-autoscaler"
@@ -124,5 +137,6 @@ func Default(cfg *Config) {
 	cfg.MaxBackendFailure = 3
 	cfg.ScaleUpTimeout = 600
 	cfg.MetricCacheExpireTime = 10
-	cfg.BackendProvsioner = "ranchernodepool"
+	cfg.BackendProvsioner = defaultProvisioner
+	cfg.MinNodeNum = 2
 }

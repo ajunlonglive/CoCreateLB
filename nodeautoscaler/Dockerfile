@@ -4,4 +4,4 @@ COPY nodeautoscaler /nodeautoscaler
 
 RUN chmod +x /nodeautoscaler
 
-CMD ["/nodeautoscaler"]
+ENTRYPOINT ["/nodeautoscaler"]

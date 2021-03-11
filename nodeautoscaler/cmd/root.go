@@ -192,4 +192,9 @@ func setConfigFlags() {
 		"insecure connection will be used if set to empty")
 	rootCmd.PersistentFlags().IntVar(&mainConfig.MinNodeNum, "min-node-num", mainConfig.MinNodeNum, "Minimum number of available node is required")
 
+	// hide flags of unfinished functionalities
+	rootCmd.PersistentFlags().MarkHidden("lease-lock-name")
+        rootCmd.PersistentFlags().MarkHidden("lease-lock-namespace")
+        rootCmd.PersistentFlags().MarkHidden("min-node-num")
+
 }

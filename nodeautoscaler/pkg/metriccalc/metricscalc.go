@@ -261,10 +261,10 @@ func (c *Calculator) calc() (avgCPUUtil, avgMemUtil float32, effNodeNum int) {
 }
 
 func (c *Calculator) judgeEventType(cpuUtil, memUtil float32, nodeNum int) ScaleT {
-	// always scale up if available nodes is not enough
-	if c.lastNodeNum < c.minNodeNum {
-		return scaleUp
-	}
+	// always scale up if available nodes is not enough (todo)
+	// if c.lastNodeNum < c.minNodeNum {
+	//	 return scaleUp
+	// }
 
 	// either cpu or memory is overused, a scaling up might be needed
 	if th, ok := c.thresholds[scaleUp][ms.MetricNodeCPU]; ok {
@@ -290,8 +290,8 @@ func (c *Calculator) judgeEventType(cpuUtil, memUtil float32, nodeNum int) Scale
 		}
 	}
 
-	// if only minimum nodes are effective, never scale down
-	if nodeNum == c.minNodeNum {
+	// if only one node, never scale down
+	if nodeNum == 1 {
 		return noScale
 	}
 

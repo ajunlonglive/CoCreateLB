@@ -138,5 +138,5 @@ func Default(cfg *Config) {
 	cfg.ScaleUpTimeout = 600
 	cfg.MetricCacheExpireTime = 10
 	cfg.BackendProvsioner = defaultProvisioner
-	cfg.MinNodeNum = 2
+	cfg.MinNodeNum = 0
 }

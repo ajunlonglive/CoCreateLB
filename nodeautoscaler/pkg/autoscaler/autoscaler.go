@@ -34,37 +34,50 @@ import (
 	pv "github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/provisioner"
 	"github.com/CoCreate-app/CoCreateLB/nodeautoscaler/pkg/util"
 
-	"k8s.io/apimachinery/pkg/util/runtime"
+	"github.com/spf13/viper"
+
 	"k8s.io/klog/v2"
 	"k8s.io/klog/v2/klogr"
 
 	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/client-go/kubernetes"
 )
 
 var logger = klogr.New().WithName("autoscaler")
 
+type autoScaleGroup struct {
+	name string
+	// metrics calculator to evaluate when to scale for this ASG
+	calculator *mcalc.Calculator
+	// metrics source for this ASG
+	metricsource ms.MetricSource
+	// provisioner for this ASG
+	provisioner pv.Provisioner
+	// selector for this ASG to match labels of nodes
+	selector labels.Selector
+	// channel to send node update to calculator
+	nodeUpdateCh chan mcalc.NodeUpdate
+}
+
 // AutoScaler is the main entity managing auto scaling
 type AutoScaler struct {
 	mainConfig config.Config
-	// controller watches node resource in Kubernetes
+	// controller watches all node resource in Kubernetes
 	kubeNodeController *controller.KubeNodeController
 	// put clientset here to support controller, general client, and leader election
 	clientset *kubernetes.Clientset
-	// keys of available node involved in metrics calculation
-	// only ready nodes are included
-	availNodes map[string]*v1.Node
+
 	// lock used to update availNodes
 	rwlock sync.RWMutex
-	// metrics calculator to evaluate when to scale
-	calculator *mcalc.Calculator
-	// metric source
-	metricSource ms.MetricSource
-	// backend provisioner
-	provisioner pv.Provisioner
+	// auto scale groups indexed by name
+	autoScaleGroups map[string]*autoScaleGroup
 
 	context context.Context
 
+	// context to lower components
+	lowerCtx context.Context
 	// cancel func for lower context
 	lowerCancel context.CancelFunc
 	// used by lower component for notifying shutdown
@@ -75,55 +88,27 @@ type AutoScaler struct {
 func NewAutoScaler(ctx context.Context, cfg config.Config) (*AutoScaler, error) {
 	as := AutoScaler{
 		mainConfig:     cfg,
-		availNodes:     make(map[string]*v1.Node, 4),
 		rwlock:         sync.RWMutex{},
 		context:        ctx,
 		reverseCloseCh: make(chan struct{}),
 	}
 
-	lowerCtx, cancel := context.WithCancel(ctx)
-
-	as.lowerCancel = cancel
-
 	var err error
+	as.lowerCtx, as.lowerCancel = context.WithCancel(ctx)
+
 	as.clientset, err = createKubeClient(cfg.KubeConfigFile)
 	if err != nil {
 		return nil, err
 	}
 
-	as.kubeNodeController, err = controller.NewController(lowerCtx, cfg, as.clientset, (&as).updateAvailNodes)
+	as.kubeNodeController, err = controller.NewController(as.lowerCtx, cfg, as.clientset, (&as).updateNodes)
 	if err != nil {
 		logger.Error(err, "failed to create node controller")
 		return nil, err
 	}
 
-	as.metricSource, err = createMetricSource(lowerCtx, cfg)
-	if err != nil {
-		logger.Error(err, "failed to create metric source", "metric source", cfg.MetricSource)
-		return nil, err
-	}
-
-	as.provisioner, err = createProvisioner(cfg)
-	if err != nil {
-		logger.Error(err, "failed to create backend provisioner", "provisioner", cfg.BackendProvsioner)
-		return nil, err
-	}
-
-	calcCfg := mcalc.InternalConfig{
-		MaxBackendFailure:      cfg.MaxBackendFailure,
-		ScaleDownThreshold:     cfg.ScaleDownThreshold,
-		ScaleUpThreshold:       cfg.ScaleUpThreshold,
-		AlarmWindow:            cfg.AlarmWindow,
-		AlarmCoolDown:          cfg.AlarmCoolDown,
-		AlarmCancelWindow:      cfg.AlarmCancelWindow,
-		MetricsCalculatePeriod: cfg.MetricsCalculatePeriod,
-		ScaleUpTimeout:         cfg.ScaleUpTimeout,
-		MinNodeNum:             cfg.MinNodeNum,
-	}
-	as.calculator, err = mcalc.NewCalculator(lowerCtx, as.reverseCloseCh, as.availNodes, &(as.rwlock),
-		as.metricSource, as.provisioner, calcCfg)
-	if err != nil {
-		logger.Error(err, "failed to create metric calculator")
+	if err = as.genAutoScaleGroups(); err != nil {
+		logger.Error(err, "failed to generate auto scale groups")
 		return nil, err
 	}
 
@@ -136,16 +121,25 @@ func (a *AutoScaler) Run() {
 	defer klog.Flush()
 	var wg sync.WaitGroup
 	defer wg.Wait()
+
 	// must be put below defer wg.Wait()
-	defer a.lowerCancel()
+	defer func() {
+		a.lowerCancel()
+		for _, asg := range a.autoScaleGroups {
+			close(asg.nodeUpdateCh)
+		}
+	}()
 
 	logger.Info("starting auto scaler")
 
 	go a.kubeNodeController.Run(&wg)
-	go a.calculator.Run(&wg)
+	for _, asg := range a.autoScaleGroups {
+		go asg.calculator.Run(&wg)
+	}
 
 	select {
 	case <-a.context.Done():
+		close(a.reverseCloseCh)
 	case <-a.reverseCloseCh:
 	}
 	logger.Info("stoping auto scaler")
@@ -175,102 +169,142 @@ func createKubeClient(kubeconfig string) (*kubernetes.Clientset, error) {
 	return clientset, nil
 }
 
-func (a *AutoScaler) updateAvailNodes(key string) error {
+func (a *AutoScaler) updateNodes(key string) error {
 	defer klog.Flush()
+	locLog := logger.WithValues("node key", key)
 
-	logger.V(3).Info("call updateAvailNodes", "key", key)
+	locLog.V(3).Info("call updateNodes", "node key", key)
 
-	var addNode, delNode bool
 	var nodeObj *v1.Node
 	var ok bool
 
 	obj, exists, err := a.kubeNodeController.GetByKey(key)
 	if err != nil {
-		logger.Error(err, "failed to get node object from cache by key", "node key", key)
+		locLog.Error(err, "failed to get node object from cache by key")
 		return err
 	}
 
 	if !exists {
-		logger.Info("Node does not exist anymore", "node key", key)
-		_, delNode = a.ifUpdateNodes(false, key)
-		addNode = false
+		// since now no way to get labels, need to notify all ASG
+		locLog.Info("node does not exist anymore, notify all auto scale group")
+		for _, asg := range a.autoScaleGroups {
+			select {
+			case asg.nodeUpdateCh <- mcalc.NodeUpdate{Key: key, Node: nil}:
+			case <-a.context.Done():
+			}
+		}
 	} else {
 		nodeObj, ok = obj.(*v1.Node)
 		if !ok {
 			err := fmt.Errorf("returned object is not a node")
-			logger.Error(err, err.Error(), "node key")
+			locLog.Error(err, "")
 			return err
 		}
-		nodeReady := isNodeReady(nodeObj)
-
-		addNode, delNode = a.ifUpdateNodes(nodeReady, key)
+		// match node to ASG
+		for _, asg := range a.autoScaleGroups {
+			match, err := util.MatchSelector(asg.selector, nodeObj)
+			if err != nil {
+				locLog.Error(err, "failed to match node labels")
+				return err
+			}
+			if match {
+				select {
+				case asg.nodeUpdateCh <- mcalc.NodeUpdate{Key: key, Node: nodeObj}:
+				case <-a.context.Done():
+				}
+			}
+		}
 	}
+	return nil
+}
 
-	if (!addNode) && (!delNode) {
+func (a *AutoScaler) genAutoScaleGroups() error {
+	if a.mainConfig.AutoScaleGroupConfig == "" {
+		asgCfg := config.Convert(a.mainConfig, "default")
+		asg, err := a.genAutoScaleGroup(asgCfg)
+		if err != nil {
+			return err
+		}
+		a.autoScaleGroups = map[string]*autoScaleGroup{asg.name: asg}
 		return nil
 	}
 
-	a.rwlock.Lock()
-	logger.V(4).Info("got write lock", "key", key)
-	defer a.rwlock.Unlock()
-
-	if delNode {
-		logger.Info("remove unavailable node out of metrics calculation", "node key", key)
-		delete(a.availNodes, key)
+	viper.SetConfigFile(a.mainConfig.AutoScaleGroupConfig)
+	asgCfgs := &config.AutoScaleGroupList{}
+	err := viper.Unmarshal(asgCfgs)
+	if err != nil {
+		logger.Error(err, "failed to parse auto scale groups",
+			"auto scale groups config file", a.mainConfig.AutoScaleGroupConfig)
+		return err
 	}
-	if addNode {
-		logger.Info("add new avaialbe node into metrics calculation", "node key", key)
-		if nodeObj == nil {
-			logger.Error(fmt.Errorf("node object is empty"), "")
+	a.autoScaleGroups = map[string]*autoScaleGroup{}
+	for _, asgCfg := range asgCfgs.AutoScaleGroups {
+		if asg, err := a.genAutoScaleGroup(asgCfg); err == nil {
+			a.autoScaleGroups[asg.name] = asg
+		} else {
+			return err
 		}
-		a.availNodes[key] = nodeObj
 	}
 
 	return nil
 }
 
-func (a *AutoScaler) ifUpdateNodes(nodeReady bool, key string) (addNode, delNode bool) {
-	addNode, delNode = false, false
-	a.rwlock.RLock()
-	defer a.rwlock.RUnlock()
-	if _, ok := a.availNodes[key]; ok {
-		if !nodeReady {
-			delNode = true
-		}
-	} else if nodeReady {
-		addNode = true
+func (a *AutoScaler) genAutoScaleGroup(asgCfg config.AutoScaleGroup) (*autoScaleGroup, error) {
+	var err error
+	locLog := logger.WithValues("auto scale group name", asgCfg.Name)
+	asg := &autoScaleGroup{}
+	if asg.metricsource, err = createMetricSource(a.lowerCtx, a.mainConfig, asgCfg); err != nil {
+		locLog.Error(err, "failed to create metrics source", "metrics source", asgCfg.MetricSource.Type)
+		return nil, err
 	}
-	return addNode, delNode
-}
-
-var nodeReadyCheckMap = map[v1.NodeConditionType]v1.ConditionStatus{
-	v1.NodeReady:              v1.ConditionTrue,
-	v1.NodeMemoryPressure:     v1.ConditionFalse,
-	v1.NodeDiskPressure:       v1.ConditionFalse,
-	v1.NodePIDPressure:        v1.ConditionFalse,
-	v1.NodeNetworkUnavailable: v1.ConditionFalse,
-}
-
-// node is considered as ready only when all above conditons are matched
-func isNodeReady(obj *v1.Node) bool {
-	for _, con := range obj.Status.Conditions {
-		if st, ok := nodeReadyCheckMap[con.Type]; ok {
-			if con.Status != st {
-				return false
-			}
-		}
+	if asg.provisioner, err = createProvisioner(a.mainConfig, asgCfg); err != nil {
+		locLog.Error(err, "failed to create backend provisioner", "backend provisioner", asgCfg.Provisioner.Type)
+		return nil, err
 	}
-	return true
+	nodeUpdateCh := make(chan mcalc.NodeUpdate, controller.DefaultWorkerNumber)
+	asg.calculator, err = createMetricCalculator(a.lowerCtx, a.mainConfig, asgCfg, a.reverseCloseCh,
+		nodeUpdateCh, asg.metricsource, asg.provisioner)
+	if err != nil {
+		locLog.Error(err, "failed to create metric calculator")
+		close(nodeUpdateCh)
+		return nil, err
+	}
+	asg.nodeUpdateCh = nodeUpdateCh
+	asg.name = asgCfg.Name
+	return asg, nil
 }
 
-func createMetricSource(ctx context.Context, cfg config.Config) (ms.MetricSource, error) {
-	switch cfg.MetricSource {
+func createMetricCalculator(ctx context.Context, cfg config.Config, asg config.AutoScaleGroup, closeCh chan struct{},
+	nodeUpdateCh chan mcalc.NodeUpdate, metricSource ms.MetricSource, p pv.Provisioner) (*mcalc.Calculator, error) {
+	calcCfg := mcalc.InternalConfig{
+		ASGName:                asg.Name,
+		MaxBackendFailure:      asg.MaxBackendFailure,
+		ScaleDownThreshold:     asg.ScaleDownThreshold,
+		ScaleUpThreshold:       asg.ScaleUpThreshold,
+		AlarmWindow:            asg.AlarmWindow,
+		AlarmCoolDown:          asg.AlarmCoolDown,
+		AlarmCancelWindow:      asg.AlarmCancelWindow,
+		MetricsCalculatePeriod: asg.MetricsCalculatePeriod,
+		ScaleUpTimeout:         asg.ScaleUpTimeout,
+		MinNodeNum:             asg.Provisioner.MinNodeNum,
+		MaxNodeNum:             asg.Provisioner.MaxNodeNum,
+	}
+	calc, err := mcalc.NewCalculator(ctx, closeCh, nodeUpdateCh, metricSource, p, calcCfg)
+	if err != nil {
+		logger.Error(err, "failed to create metric calculator", "auto scale group name", asg.Name)
+		return nil, err
+	}
+	return calc, nil
+}
+
+func createMetricSource(ctx context.Context, cfg config.Config, asg config.AutoScaleGroup) (ms.MetricSource, error) {
+	switch asg.MetricSource.Type {
 	case ms.MetricSourceKube:
 		restCfg, err := util.CreateRestCfg(cfg.KubeConfigFile)
 		if err != nil {
 			return nil, err
 		}
-		ms, err := ms.NewKubeMetricSource(ctx, restCfg, time.Duration(cfg.MetricCacheExpireTime)*time.Second, cfg.LabelSelector)
+		ms, err := ms.NewKubeMetricSource(ctx, restCfg, time.Duration(asg.MetricSource.CacheExpireTime)*time.Second, asg.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
@@ -280,13 +314,13 @@ func createMetricSource(ctx context.Context, cfg config.Config) (ms.MetricSource
 	}
 }
 
-func createProvisioner(cfg config.Config) (pv.Provisioner, error) {
-	switch cfg.BackendProvsioner {
+func createProvisioner(cfg config.Config, asg config.AutoScaleGroup) (pv.Provisioner, error) {
+	switch asg.Provisioner.Type {
 	case pv.ProvisionerRancherNodePool:
 		proCfg := pv.InternalConfig{
 			RancherURL:        cfg.RancherURL,
 			RancherToken:      cfg.RancherToken,
-			RancherNodePoolID: cfg.RancherNodePodID,
+			RancherNodePoolID: asg.Provisioner.RancherNodePoolID,
 			RancherCA:         cfg.RancherCA,
 		}
 		p, err := pv.NewProvisionerRancherNodePool(proCfg)

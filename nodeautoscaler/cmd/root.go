@@ -154,15 +154,22 @@ func setKlogFlags() {
 
 func setConfigFlags() {
 	rootCmd.PersistentFlags().StringVar(&CfgFile, "config", CfgFile, "Path to config file")
-	rootCmd.PersistentFlags().StringVar((*string)(&mainConfig.MetricSource), "metric-source",
-		string(mainConfig.MetricSource), fmt.Sprintf("Type of metric source, support %s", ms.SupportSourceType()))
 	rootCmd.PersistentFlags().StringVar(&mainConfig.KubeConfigFile, "kubeconfig", "", "Path to a kubeconfig file, use in-cluster config if empty")
-	rootCmd.PersistentFlags().StringVar(&mainConfig.LabelSelector, "label-selector", mainConfig.LabelSelector, "A list of \"label_name=label_value\" "+
-		"separated by comma. Nodes with exactly matching label set are watched by autoscaler. All nodes are processed if set to empty")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.LeaseLockName, "lease-lock-name", mainConfig.LeaseLockName, "The lease lock resource name")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.LeaseLockNamespace, "lease-lock-namespace", mainConfig.LeaseLockNamespace, "The lease lock resource namespace")
 	rootCmd.PersistentFlags().IntVar(&mainConfig.CacheResyncPeriod, "cache-resync-period", mainConfig.CacheResyncPeriod, "The period in seconds "+
 		"in which the available node list should be considered in metrics calculation is updated")
+	rootCmd.PersistentFlags().StringVar(&mainConfig.AutoScaleGroupConfig, "auto-scale-group-config", mainConfig.AutoScaleGroupConfig,
+		"The path to a file that claims configurations of different auto scale groups")
+
+	/*
+	 * below parameters can be overrided by auto scale group specific configurations
+	 *
+	 */
+	rootCmd.PersistentFlags().StringVar((*string)(&mainConfig.MetricSource), "metric-source",
+		string(mainConfig.MetricSource), fmt.Sprintf("Type of metric source, support %s", ms.SupportSourceType()))
+	rootCmd.PersistentFlags().StringVar(&mainConfig.LabelSelector, "label-selector", mainConfig.LabelSelector, "A list of \"label_name=label_value\" "+
+		"separated by comma. Nodes with exactly matching label set are watched by autoscaler. All nodes are processed if set to empty")
 	rootCmd.PersistentFlags().IntVar(&mainConfig.MetricsCalculatePeriod, "metrics-cal-period", mainConfig.MetricsCalculatePeriod,
 		"The period in seconds in which node metrics are recalculated")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.ScaleUpThreshold, "scale-up-threshold", mainConfig.ScaleUpThreshold, "Thresholds, in ratio, exceeding which a scale up is triggered")
@@ -185,16 +192,18 @@ func setConfigFlags() {
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherURL, "rancher-url", mainConfig.RancherURL, "URL of Rancher to access if use Rancher as backend provisioner")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherToken, "rancher-token", mainConfig.RancherToken,
 		"Token used to access Rancher if use Rancher as backend provisioner")
-	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherNodePodID, "rancher-node-pool-id", mainConfig.RancherNodePodID,
+	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherNodePoolID, "rancher-node-pool-id", mainConfig.RancherNodePoolID,
 		"ID of node pool in Rancher when backend-provisioner is set to ranchernodepool. Scaler will only manipulate nodes which are both in this pool "+
 			"and match the label-selector. It's better to set related node labels at node pool level")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherCA, "rancher-ca", mainConfig.RancherCA, "Path to a CA to verify Rancher server, "+
 		"insecure connection will be used if set to empty")
-	rootCmd.PersistentFlags().IntVar(&mainConfig.MinNodeNum, "min-node-num", mainConfig.MinNodeNum, "Minimum number of available node is required")
+	rootCmd.PersistentFlags().IntVar(&mainConfig.MaxNodeNum, "max-node-num", mainConfig.MaxNodeNum,
+		"Maximum number of nodes can exist after scaling up. Only blocks scaling up, i.e. no auto scaling down if nodes are redundant")
+	rootCmd.PersistentFlags().IntVar(&mainConfig.MinNodeNum, "min-node-num", mainConfig.MinNodeNum,
+		"Minimum number of existing nodes before scaling down. Only blocks scaling down, i.e. no auto scaling up if nodes are insufficient")
 
 	// hide flags of unfinished functionalities
 	rootCmd.PersistentFlags().MarkHidden("lease-lock-name")
-        rootCmd.PersistentFlags().MarkHidden("lease-lock-namespace")
-        rootCmd.PersistentFlags().MarkHidden("min-node-num")
+	rootCmd.PersistentFlags().MarkHidden("lease-lock-namespace")
 
 }

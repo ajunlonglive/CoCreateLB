@@ -46,14 +46,20 @@ func SupportProvisionerType() string {
 // Provisioner is the interface for provisioning nodes
 type Provisioner interface {
 	Type() ProvisionerT
-	// ScaleUp calls backend system to scale up ONE node.
-	// Note that this func is called in an async manner,
-	// and metric calculator does not rely on any response
+	// ScaleUp calls backend system to scale up ONE node
+	// with the maximum number of nodes can exist after scaling up.
+	// This func returns a bool tells caller whether current number
+	// of exiting nodes reaches or exceeds maximum number of nodes
+	// Note that this func calls backend in an async manner,
+	// caller should not rely on any response
 	// from backend
-	ScaleUp()
-	// ScaleDown calls backend system to scale down ONE node.
-	// Note that this func is called in an async manner,
-	// and metric calculator does not rely on any response
+	ScaleUp(int) bool
+	// ScaleDown calls backend system to scale down ONE node
+	// with the minimum number of nodes existing before scaling down.
+	// This func returns a bool tells caller whether current number
+	// of exiting nodes equals or is less than minimum number of nodes
+	// Note that this func calls backend in an async manner,
+	// caller should not rely on any response
 	// from backend
-	ScaleDown()
+	ScaleDown(int) bool
 }

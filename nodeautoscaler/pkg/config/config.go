@@ -33,17 +33,24 @@ const (
 
 // Config presents configuration needed
 type Config struct {
-	// MetricSource indicates the source where metrics are read
-	MetricSource ms.MetricSourceT
+	/*
+	 * as autoscaler runs in and only manages a single cluster
+	 * assume only need a sole kubeconfig and a sole rancher credential
+	 */
 
 	// KubeConfigFile is the path to a kubeconfig file
 	// If this is empty, in-cluster config is used
 	KubeConfigFile string
 
-	// LabelSelector is a list of "label_name=label_value" separated by comma.
-	// autoscaler will only watch those nodes with exactlly matching label set,
-	// or watch all nodes if this is set to empty.
-	LabelSelector string
+	// RancherUrl is the url of Rancher
+	RancherURL string
+
+	// RancherToken is used to access Rancher at RancherURL
+	RancherToken string
+
+	// RancherCA is the path to a CA to validate Rancher server
+	// Insecure connection is used if this is empty
+	RancherCA string
 
 	// LeaseLockName is the lease lock resource name used for leader election
 	LeaseLockName string
@@ -55,8 +62,25 @@ type Config struct {
 	// to update available node list which should be considered in metrics calculation
 	CacheResyncPeriod int
 
+	// AutoScaleGroupConfig is the path to a file that claims configurations
+	// of different auto scale groups
+	AutoScaleGroupConfig string
+
+	/*
+	 * below parameters can be overrided by auto scale group specific configurations
+	 *
+	 */
+
+	// MetricSource indicates the source where metrics are read
+	MetricSource ms.MetricSourceT
+
 	// MetricsCalculatePeriod is the period in seconds in which metrics are calculated
 	MetricsCalculatePeriod int
+
+	// LabelSelector is a list of "label_name=label_value" separated by comma.
+	// autoscaler will only watch those nodes with exactlly matching label set,
+	// or watch all nodes if this is set to empty.
+	LabelSelector string
 
 	// ScaleUpThreshold denotes thresholds, in ratio, exceeding which a scale up is triggered
 	// for both memory and cpu metrics, e.g. memory=0.7,cpu=0.7
@@ -94,23 +118,24 @@ type Config struct {
 	// BackendProvsioner indicates the type of backend used to provision nodes
 	BackendProvsioner pv.ProvisionerT
 
-	// RancherUrl is the url of Rancher
-	RancherURL string
-
-	// RancherToken is used to access Rancher at RancherURL
-	RancherToken string
-
 	// RancherNodePoolID is the ID of a node pool in Rancher
 	// Only nodes in this pool and match LabelSelector will be manipulate
 	// Better enable related node labels in node pool level
 	// This is only effect when ranchernodepool is used as backend
-	RancherNodePodID string
+	RancherNodePoolID string
 
-	// RancherCA is the path to a CA to validate Rancher server
-	// Insecure connection is used if this is empty
-	RancherCA string
+	// MaxNodeNum denotes at most how many nodes can exist
+	// after scaling up.
+	// Note that this only blocks a scaling up, rather than maintains
+	// a fix number, i.e. if existing nodes are more, no scaling down
+	// is triggered due to this parameter
+	MaxNodeNum int
 
-	// MinNodeNum denotes at least how many available nodes are required
+	// MinNodeNum denotes at least how many nodes must exist
+	// before scaling down.
+	// Note that this only blocks a scaling down, rather than maintains
+	// a fix number, i.e. if existing nodes are less, no scaling up
+	// is triggered due to this parameter
 	MinNodeNum int
 }
 
@@ -123,11 +148,12 @@ func NewConfig() Config {
 // Default set default values to configuration
 // Do not use klogr here as klogr is not initialized yet
 func Default(cfg *Config) {
-	cfg.MetricSource = defaultMetricSource
-	cfg.LabelSelector = ""
 	cfg.LeaseLockName = "node-autoscaler"
 	cfg.LeaseLockNamespace = "node-autoscaler"
 	cfg.CacheResyncPeriod = 0
+	cfg.AutoScaleGroupConfig = ""
+	cfg.MetricSource = defaultMetricSource
+	cfg.LabelSelector = ""
 	cfg.MetricsCalculatePeriod = 5
 	cfg.ScaleUpThreshold = "memory=0.7,cpu=0.7"
 	cfg.ScaleDownThreshold = "memory=0.15,cpu=0.15"
@@ -138,5 +164,6 @@ func Default(cfg *Config) {
 	cfg.ScaleUpTimeout = 600
 	cfg.MetricCacheExpireTime = 10
 	cfg.BackendProvsioner = defaultProvisioner
-	cfg.MinNodeNum = 0
+	cfg.MaxNodeNum = 8
+	cfg.MinNodeNum = 1
 }

@@ -22,9 +22,11 @@
 package provisioner
 
 import (
+	"fmt"
 	"io/ioutil"
 	"strings"
 
+	"github.com/go-logr/logr"
 	"github.com/rancher/norman/clientbase"
 	managementClient "github.com/rancher/types/client/management/v3"
 	"k8s.io/klog/v2"
@@ -48,17 +50,24 @@ type provisionerRancherNodePool struct {
 	rancherNodePoolID string
 	rancherCA         string
 
+	logger logr.Logger
+
 	// management client used to connect to Rancher
 	rancherClient *managementClient.Client
 }
 
 // NewProvisionerRancherNodePool creates a provisionerRancherNodePool
 func NewProvisionerRancherNodePool(cfg InternalConfig) (Provisioner, error) {
+	if cfg.RancherNodePoolID == "" {
+		return nil, fmt.Errorf("rancher node pool ID must be set to use ranchernodepool provisioner")
+	}
+
 	p := &provisionerRancherNodePool{
 		rancherURL:        cfg.RancherURL,
 		rancherToken:      cfg.RancherToken,
 		rancherNodePoolID: cfg.RancherNodePoolID,
 		rancherCA:         cfg.RancherCA,
+		logger:            logger.WithValues("node pool ID", cfg.RancherNodePoolID),
 	}
 
 	err := p.createRancherClient()
@@ -72,13 +81,13 @@ func NewProvisionerRancherNodePool(cfg InternalConfig) (Provisioner, error) {
 func (p *provisionerRancherNodePool) createRancherClient() error {
 	opts, err := p.createClientOpts()
 	if err != nil {
-		logger.Error(err, "failed to create Rancher client options")
+		p.logger.Error(err, "failed to create Rancher client options")
 		return err
 	}
 
 	mClient, err := managementClient.NewClient(opts)
 	if err != nil {
-		logger.Error(err, "failed to create Rancher client")
+		p.logger.Error(err, "failed to create Rancher client")
 		return err
 	}
 
@@ -99,7 +108,7 @@ func (p *provisionerRancherNodePool) createClientOpts() (*clientbase.ClientOpts,
 	if p.rancherCA != "" {
 		b, err := ioutil.ReadFile(p.rancherCA)
 		if err != nil {
-			logger.Error(err, "failed to read Rancher CA", "Rancher CA", p.rancherCA)
+			p.logger.Error(err, "failed to read Rancher CA", "Rancher CA", p.rancherCA)
 			return nil, err
 		}
 		opts = &clientbase.ClientOpts{
@@ -122,40 +131,56 @@ func (p *provisionerRancherNodePool) Type() ProvisionerT {
 	return ProvisionerRancherNodePool
 }
 
-func (p *provisionerRancherNodePool) ScaleUp() {
+func (p *provisionerRancherNodePool) ScaleUp(maxN int) bool {
 	defer klog.Flush()
-	logger.Info("call backend to scale up")
+	p.logger.Info("call backend to scale up")
 
 	nodePool, err := p.rancherClient.NodePool.ByID(p.rancherNodePoolID)
 	if err != nil {
-		logger.Error(err, "failed to get Rancher node pool", "node pool ID", p.rancherNodePoolID)
+		p.logger.Error(err, "failed to get Rancher node pool", "node pool ID", p.rancherNodePoolID)
+		return false
 	}
-	logger.Info("get node pool info",
+	p.logger.Info("get node pool info",
 		"name", nodePool.Name,
 		"node labels", nodePool.NodeLabels,
 		"quantity", nodePool.Quantity,
 		"display name", nodePool.DisplayName)
+
+	if nodePool.Quantity >= int64(maxN) {
+		p.logger.Info("maximum allowed number of nodes reached or exceeded, ignore scaling up",
+			"node pool ID", nodePool.ID, "number of existing nodes", nodePool.Quantity)
+		return true
+	}
 
 	ret := nodePool.Quantity + 1
-	p.rancherClient.NodePool.Update(nodePool, map[string]int64{"quantity": ret})
+	go p.rancherClient.NodePool.Update(nodePool, map[string]int64{"quantity": ret})
+	return false
 }
 
-func (p *provisionerRancherNodePool) ScaleDown() {
+func (p *provisionerRancherNodePool) ScaleDown(minN int) bool {
 	defer klog.Flush()
-	logger.Info("call backend to scale down")
+	p.logger.Info("call backend to scale down")
 
 	nodePool, err := p.rancherClient.NodePool.ByID(p.rancherNodePoolID)
 	if err != nil {
-		logger.Error(err, "failed to get Rancher node pool", "node pool ID", p.rancherNodePoolID)
+		p.logger.Error(err, "failed to get Rancher node pool", "node pool ID", p.rancherNodePoolID)
+		return false
 	}
-	logger.Info("get node pool info",
+	p.logger.Info("get node pool info",
 		"name", nodePool.Name,
 		"node labels", nodePool.NodeLabels,
 		"quantity", nodePool.Quantity,
 		"display name", nodePool.DisplayName)
+
+	if nodePool.Quantity <= int64(minN) {
+		p.logger.Info("existing number of nodes equals or is below minimum number, ignore scaling down",
+			"node pool ID", nodePool.ID, "number of existing nodes", nodePool.Quantity)
+		return true
+	}
 
 	ret := nodePool.Quantity - 1
 	if ret > 0 {
-		p.rancherClient.NodePool.Update(nodePool, map[string]int64{"quantity": ret})
+		go p.rancherClient.NodePool.Update(nodePool, map[string]int64{"quantity": ret})
 	}
+	return false
 }

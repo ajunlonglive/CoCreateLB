@@ -43,7 +43,8 @@ import (
 )
 
 const (
-	defaultWorkerNumber = 3
+	// DefaultWorkerNumber is default number of workers
+	DefaultWorkerNumber = 3
 )
 
 var logger = klogr.New().WithName("kubenode-controller")
@@ -181,7 +182,7 @@ func (c *KubeNodeController) Run(wg *sync.WaitGroup) {
 		return
 	}
 
-	for i := 0; i < defaultWorkerNumber; i++ {
+	for i := 0; i < DefaultWorkerNumber; i++ {
 		go wait.Until(c.runWorker, time.Second, c.context.Done())
 	}
 

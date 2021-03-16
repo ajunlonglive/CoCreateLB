@@ -101,13 +101,13 @@ type Provisioner struct {
 	// Note that this only blocks a scaling up, rather than maintains
 	// a fix number, i.e. if existing nodes are more, no scaling down
 	// is triggered due to this parameter
-	MaxNodeNum int `mapstructure:"maxNodeNume"`
+	MaxNodeNum int `mapstructure:"maxNodeNum"`
 	// MinNodeNum denotes at least how many nodes must exist
 	// before scaling down.
 	// Note that this only blocks a scaling down, rather than maintains
 	// a fix number, i.e. if existing nodes are less, no scaling up
 	// is triggered due to this parameter
-	MinNodeNum int `mapstructure:"minNodeNume"`
+	MinNodeNum int `mapstructure:"minNodeNum"`
 
 	// RancherNodePoolID is the ID of a node pool in Rancher
 	// Only nodes in this pool and match LabelSelector will be manipulate

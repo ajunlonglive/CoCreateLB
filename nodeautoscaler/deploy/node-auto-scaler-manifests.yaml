@@ -140,7 +140,7 @@ spec:
         - "--alarm-cool-down=600"
         - "--scale-up-timeout=720"
         - "--max-backend-failure=1"
-        - "--min-node-num=1"
+        - "--min-node-num=2"
         - "--max-node-num=4"
         - "--rancher-url=$(RANCHER_URL)"
         - "--rancher-token=$(RANCHER_TOKEN)"

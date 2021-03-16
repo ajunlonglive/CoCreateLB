@@ -161,9 +161,9 @@ func Default(cfg *Config) {
 	cfg.AlarmCoolDown = 300
 	cfg.AlarmCancelWindow = 600
 	cfg.MaxBackendFailure = 3
-	cfg.ScaleUpTimeout = 600
+	cfg.ScaleUpTimeout = 720
 	cfg.MetricCacheExpireTime = 10
 	cfg.BackendProvsioner = defaultProvisioner
 	cfg.MaxNodeNum = 8
-	cfg.MinNodeNum = 1
+	cfg.MinNodeNum = 2
 }

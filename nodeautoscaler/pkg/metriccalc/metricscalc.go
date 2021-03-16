@@ -241,7 +241,7 @@ func (c *Calculator) handleNodeUpdate() {
 func (c *Calculator) updateAvailNodes(nu NodeUpdate) {
 	defer klog.Flush()
 	locLog := c.logger.WithValues("node key", nu.Key)
-	locLog.Info("receive node update")
+	locLog.V(3).Info("receive node update")
 
 	var addNode, delNode, nodeReady bool
 
@@ -420,7 +420,12 @@ func (c *Calculator) updateEvent(cpuUtil, memUtil float32, nodeNum int) {
 		}
 		return
 	}
-
+	c.logger.V(2).Info("evaluate next fire time by alarm window", "next fire time", c.curEvent.shouldFiredTime,
+		"scale type", c.curEvent.eventType)
+	if c.lastFiredEvent != nil {
+		c.logger.V(2).Info("evaluate next fire time by alarm cool down", "next fire time", c.lastFiredEvent.allowNextFireTime,
+			"scale type", c.curEvent.eventType)
+	}
 	if c.curEvent.shouldFiredTime.Before(nowTime) {
 		if c.lastFiredEvent == nil || nowTime.After(c.lastFiredEvent.allowNextFireTime) {
 			c.curEvent.firedTime = nowTime
@@ -483,10 +488,10 @@ func (c *Calculator) fire(s ScaleT) {
 		if c.waitForScaleUp() {
 			c.backendFailureNum = c.backendFailureNum + 1
 			c.logger.Error(fmt.Errorf("waiting for scaling up timed out"),
-				"waiting for scaling up timed out", "timeout times", c.backendFailureNum)
+				"", "timeout times", c.backendFailureNum)
 			if c.backendFailureNum > c.maxBackendFailure {
 				c.logger.Error(fmt.Errorf("exceed max backend failure times"),
-					"exceed max backend failure times, stop the whole program")
+					"stop the whole program")
 				close(c.upperCloseCh)
 				return
 			}

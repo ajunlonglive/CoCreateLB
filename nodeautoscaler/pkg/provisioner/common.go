@@ -35,12 +35,14 @@ type ProvisionerT string
 const (
 	// ProvisionerRancherNodePool means utilizing Rancher's node pool API to provision nodes
 	ProvisionerRancherNodePool ProvisionerT = "ranchernodepool"
+	// ProvisionerFake is used to test
+	ProvisionerFake ProvisionerT = "fake"
 )
 
 // SupportProvisionerType returns the list of supporting types of provisioner
 // Update this func when new type is added
 func SupportProvisionerType() string {
-	return fmt.Sprintf("\"%s\"", ProvisionerRancherNodePool)
+	return fmt.Sprintf("\"%s\", \"%s\"", ProvisionerRancherNodePool, ProvisionerFake)
 }
 
 // Provisioner is the interface for provisioning nodes

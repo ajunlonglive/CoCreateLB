@@ -67,7 +67,8 @@ func NewProvisionerRancherNodePool(cfg InternalConfig) (Provisioner, error) {
 		rancherToken:      cfg.RancherToken,
 		rancherNodePoolID: cfg.RancherNodePoolID,
 		rancherCA:         cfg.RancherCA,
-		logger:            logger.WithValues("node pool ID", cfg.RancherNodePoolID),
+		logger: logger.WithValues("provisioner", ProvisionerRancherNodePool,
+			"node pool ID", cfg.RancherNodePoolID),
 	}
 
 	err := p.createRancherClient()

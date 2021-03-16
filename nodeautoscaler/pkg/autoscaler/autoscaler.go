@@ -173,7 +173,7 @@ func (a *AutoScaler) updateNodes(key string) error {
 	defer klog.Flush()
 	locLog := logger.WithValues("node key", key)
 
-	locLog.V(3).Info("call updateNodes", "node key", key)
+	locLog.V(4).Info("call updateNodes", "node key", key)
 
 	var nodeObj *v1.Node
 	var ok bool
@@ -221,6 +221,7 @@ func (a *AutoScaler) updateNodes(key string) error {
 func (a *AutoScaler) genAutoScaleGroups() error {
 	if a.mainConfig.AutoScaleGroupConfig == "" {
 		asgCfg := config.Convert(a.mainConfig, "default")
+		asgCfg.Print()
 		asg, err := a.genAutoScaleGroup(asgCfg)
 		if err != nil {
 			return err
@@ -230,8 +231,13 @@ func (a *AutoScaler) genAutoScaleGroups() error {
 	}
 
 	viper.SetConfigFile(a.mainConfig.AutoScaleGroupConfig)
-	asgCfgs := &config.AutoScaleGroupList{}
-	err := viper.Unmarshal(asgCfgs)
+	if err := viper.ReadInConfig(); err != nil {
+		logger.Error(err, "failed to read auto scale groups config",
+			"auto scale groups config file", a.mainConfig.AutoScaleGroupConfig)
+		return err
+	}
+	asgCfgs := config.AutoScaleGroupList{}
+	err := viper.Unmarshal(&asgCfgs)
 	if err != nil {
 		logger.Error(err, "failed to parse auto scale groups",
 			"auto scale groups config file", a.mainConfig.AutoScaleGroupConfig)
@@ -239,6 +245,9 @@ func (a *AutoScaler) genAutoScaleGroups() error {
 	}
 	a.autoScaleGroups = map[string]*autoScaleGroup{}
 	for _, asgCfg := range asgCfgs.AutoScaleGroups {
+		(&asgCfg).Merge(a.mainConfig)
+		logger.Info("detect an auto scale group")
+		(&asgCfg).Print()
 		if asg, err := a.genAutoScaleGroup(asgCfg); err == nil {
 			a.autoScaleGroups[asg.name] = asg
 		} else {
@@ -253,6 +262,10 @@ func (a *AutoScaler) genAutoScaleGroup(asgCfg config.AutoScaleGroup) (*autoScale
 	var err error
 	locLog := logger.WithValues("auto scale group name", asgCfg.Name)
 	asg := &autoScaleGroup{}
+	if asg.selector, err = util.ParseSelector(asgCfg.LabelSelector); err != nil {
+		return nil, err
+	}
+
 	if asg.metricsource, err = createMetricSource(a.lowerCtx, a.mainConfig, asgCfg); err != nil {
 		locLog.Error(err, "failed to create metrics source", "metrics source", asgCfg.MetricSource.Type)
 		return nil, err
@@ -328,6 +341,8 @@ func createProvisioner(cfg config.Config, asg config.AutoScaleGroup) (pv.Provisi
 			return nil, err
 		}
 		return p, nil
+	case pv.ProvisionerFake:
+		return pv.NewProvisionerFake(), nil
 	default:
 		return nil, fmt.Errorf("unkown backend provisioner %s", cfg.BackendProvsioner)
 	}

@@ -23,6 +23,9 @@ See comments below for some detailed information.
 rbac:
   create: true
 
+serviceAccount:
+  create: true
+
 controller:
   name: controller
   image:
@@ -32,6 +35,19 @@ controller:
 
   # use DaemonSet so no need to manage replicas
   kind: DaemonSet
+
+  # all kernel tuning for performance done here
+  initContainers:
+  - name: sysctl
+    image: "busybox:musl"
+    command:
+      - /bin/sh
+      - -c
+      - sysctl -w net.core.somaxconn=100000
+      - sysctl -w net.ipv4.tcp_max_syn_backlog=100000
+      - sysctl -w net.core.netdev_max_backlog=100000
+    securityContext:
+      privileged: true
 
   terminationGracePeriodSeconds: 300
 
@@ -109,26 +125,18 @@ controller:
   # see https://rancher.com/docs/rke/latest/en/config-options/add-ons/ingress-controllers/#scheduling-ingress-controllers for how to select nodes for ingress in rke
   nodeSelector:
     nodeType: loadbalancer
-  
+
   # this is for using host network in haproxy pods
   # if loadbalancer type service is used to expose haproxy pods
-  # set below to ClusterFirst   
+  # set below to ClusterFirst
   dnsPolicy: ClusterFirstWithHostNet
-  
-  
+
+
   extraArgs:
-    # define L4 proxy servic via port mapping in ConfigMap entries
-    # example: "80": ingress-nginx/ingress-nginx:80
-    # this directs traffic arrives at 80 port of haproxy
-    # to the port of service "ingress-nginx"
-    # in the namespace "ingress-nginx"
-    - --configmap-tcp-services=ingress-haproxy/tcp-services
-    # disable default http frontend on 80 port
-    # so 80 port can be used for L4 proxy
-    - --disable-http
-    # disable default https frontend on 443 port
-    # so 443 port can used for L4 proxy
-    - --disable-https
+
+  # haproxy tuning
+  config:
+    maxconn: "100000"
 
   logging:
     level: info
@@ -159,9 +167,9 @@ controller:
       http: http
       https: https
       stat: stat
-    
+
     # no need to set extra tcp ports
-    # as port 80 and 443 are reused  
+    # as port 80 and 443 are reused
     tcpPorts: []
 
     # externalIPs:
@@ -186,7 +194,7 @@ serviceMonitor:
 
 # only needed if http and https frontends are enabled
 defaultBackend:
-  enabled: false
+  enabled: true
   name: default-backend
   replicaCount: 1
 
@@ -229,53 +237,88 @@ status: {}
 EOF
 ```
 
-## Define configmap describing services handled by L4 proxy
+## Define haproxy managed ingresses pointing to apps
 
 ```bash
-cat <<EOF > cm-tcp-services.yaml
+cat <<EOF > ing-app.yaml
 ---
-apiVersion: v1
-data:
-  "80": ingress-nginx/ingress-nginx:80
-  "443": ingress-nginx/ingress-nginx:443
-kind: ConfigMap
+kind: Ingress
+apiVersion: networking.k8s.io/v1
 metadata:
-  creationTimestamp: null
-  name: tcp-services
-  namespace: ingress-haproxy
----
-EOF
-```
-
-## Define service targeting at all available nginx ingress controller instances
-
-```bash
-cat <<EOF > ing-ingress-nginx.yaml
----
-apiVersion: v1
-kind: Service
-metadata:
-  creationTimestamp: null
+  name: cocreatews-haproxy
+  namespace: default
   labels:
-    app: ingress-nginx
-  name: ingress-nginx
-  namespace: ingress-nginx
+    app: cocreatews
+  annotations:
+    haproxy.org/ingress.class: "haproxy"
 spec:
-  ports:
-  - name: http
-    port: 80
-    protocol: TCP
-    targetPort: 80
-  - name: https
-    port: 443
-    protocol: TCP
-    targetPort: 443
-  selector:
-    # ensure the right label is used
-    app: ingress-nginx
-  type: ClusterIP
-status:
-  loadBalancer: {}
+  tls:
+    - hosts:
+        - '*.cocreate.app'
+      secretName: cocreate-app
+  rules:
+    - host: '*.cocreate.app'
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreatews
+                port:
+                  number: 3000
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: cocreatecrdtws-haproxy
+  namespace: default
+  labels:
+    app: cocreatecrdtws
+  annotations:
+    haproxy.org/ingress.class: "haproxy"
+spec:
+  tls:
+    - hosts:
+        - '*.cocreate.app'
+      secretName: cocreate-app
+  rules:
+    - host: '*.cocreate.app'
+      http:
+        paths:
+          - path: /crdt
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreatecrdtws
+                port:
+                  number: 3001
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: cocreate-api-haproxy
+  namespace: default
+  labels:
+    app: cocreate-api
+  annotations:
+    haproxy.org/ingress.class: "haproxy"
+spec:
+  tls:
+    - hosts:
+        - '*.cocreate.app'
+      secretName: cocreate-app
+  rules:
+    - host: '*.cocreate.app'
+      http:
+        paths:
+          - path: /api
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreate-api
+                port:
+                  number: 3002
 ---
 EOF
 ```
@@ -285,8 +328,7 @@ EOF
 ```bash
 # combine files together in order
 cat ns-ingress-haproxy.yaml > haproxy-ingress-manifests.yaml
-cat cm-tcp-services.yaml >> haproxy-ingress-manifests.yaml
-cat ing-ingress-nginx.yaml >> haproxy-ingress-manifests.yaml
+cat ing-app.yaml >> haproxy-ingress-manifests.yaml
 cat haproxy-ingress.yaml >> haproxy-ingress-manifests.yaml
 
 # apply

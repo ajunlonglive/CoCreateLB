@@ -82,7 +82,6 @@ data:
         provisioner:
           type: ranchernodepool
           rancherNodePoolID: "c-bflfq:np-7hb6l"
-          maxNodeNum: 8
 kind: ConfigMap
 metadata:
   creationTimestamp: null
@@ -116,6 +115,8 @@ spec:
       labels:
         app: node-auto-scaler
     spec:
+      nodeSelector:
+        nodeType: loadbalancer
       serviceAccountName: node-auto-scaler
       containers:
       - image: jiuchen1986/nodeautoscaler:v0.0.2
@@ -141,7 +142,7 @@ spec:
         - "--scale-up-timeout=720"
         - "--max-backend-failure=1"
         - "--min-node-num=2"
-        - "--max-node-num=4"
+        - "--max-node-num=2"
         - "--rancher-url=$(RANCHER_URL)"
         - "--rancher-token=$(RANCHER_TOKEN)"
         resources: {}

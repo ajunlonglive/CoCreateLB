@@ -27,7 +27,10 @@ import (
 
 	"github.com/spf13/pflag"
 
+	v1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
@@ -43,6 +46,18 @@ func NormalizeFunc(f *pflag.FlagSet, name string) pflag.NormalizedName {
 // ParseSelector parse a string like "key1=val1,key2=val2" to a label selector
 func ParseSelector(selector string) (labels.Selector, error) {
 	return labels.Parse(selector)
+}
+
+var _ runtime.Object = &v1.Node{}
+
+// MatchSelector checks if given node object matches given selector
+func MatchSelector(selector labels.Selector, obj *v1.Node) (bool, error) {
+	accessor := meta.NewAccessor()
+	l, err := accessor.Labels(obj)
+	if err != nil {
+		return false, err
+	}
+	return selector.Matches(labels.Set(l)), nil
 }
 
 // CreateRestCfg generates rest.Config based on path to kubeconfig

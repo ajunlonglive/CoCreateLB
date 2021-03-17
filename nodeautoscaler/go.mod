@@ -5,6 +5,7 @@ go 1.15
 replace k8s.io/client-go => k8s.io/client-go v0.18.8
 
 require (
+	github.com/go-logr/logr v0.4.0
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/rancher/norman v0.0.0-20210225010917-c7fd1e24145b
 	github.com/rancher/types v0.0.0-20210123000350-7cb436b3f0b0

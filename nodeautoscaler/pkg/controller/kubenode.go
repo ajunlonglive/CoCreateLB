@@ -35,6 +35,7 @@ import (
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/util/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -43,7 +44,8 @@ import (
 )
 
 const (
-	defaultWorkerNumber = 3
+	// DefaultWorkerNumber is default number of workers
+	DefaultWorkerNumber = 3
 )
 
 var logger = klogr.New().WithName("kubenode-controller")
@@ -62,10 +64,14 @@ type KubeNodeController struct {
 func NewController(ctx context.Context, cfg config.Config, clientset *kubernetes.Clientset, processKeyFunc func(key string) error) (*KubeNodeController, error) {
 	defer klog.Flush()
 
-	nodeListWatcher, err := createLabelSelectedListWatcher(clientset, cfg.LabelSelector)
-	if err != nil {
-		return nil, err
-	}
+	/*
+		nodeListWatcher, err := createLabelSelectedListWatcher(clientset, cfg.LabelSelector)
+		if err != nil {
+			return nil, err
+		}
+	*/
+
+	nodeListWatcher := cache.NewListWatchFromClient(clientset.CoreV1().RESTClient(), "nodes", "", fields.Everything())
 
 	queue := workqueue.NewRateLimitingQueue(workqueue.DefaultControllerRateLimiter())
 
@@ -181,12 +187,12 @@ func (c *KubeNodeController) Run(wg *sync.WaitGroup) {
 		return
 	}
 
-	for i := 0; i < defaultWorkerNumber; i++ {
+	for i := 0; i < DefaultWorkerNumber; i++ {
 		go wait.Until(c.runWorker, time.Second, c.context.Done())
 	}
 
 	<-c.context.Done()
-	logger.Info("stopping Pod controller")
+	logger.Info("stopping Node controller")
 }
 
 func (c *KubeNodeController) runWorker() {

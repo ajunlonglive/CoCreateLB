@@ -251,6 +251,7 @@ metadata:
     app: cocreatews
   annotations:
     haproxy.org/ingress.class: "haproxy"
+    haproxy.org/load-balance: "uri"
 spec:
   tls:
     - hosts:
@@ -277,6 +278,7 @@ metadata:
     app: cocreatecrdtws
   annotations:
     haproxy.org/ingress.class: "haproxy"
+    haproxy.org/load-balance: "uri"
 spec:
   tls:
     - hosts:
@@ -303,6 +305,7 @@ metadata:
     app: cocreate-api
   annotations:
     haproxy.org/ingress.class: "haproxy"
+    haproxy.org/load-balance: "uri"
 spec:
   tls:
     - hosts:

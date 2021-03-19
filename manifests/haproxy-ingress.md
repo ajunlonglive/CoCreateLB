@@ -237,6 +237,93 @@ status: {}
 EOF
 ```
 
+## Define service with special load-balance algorithm
+```bash
+cat <<EOF > svc-app.yaml
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cocreate-api-haproxy
+  namespace: default
+  labels:
+    app: cocreate-api
+  annotations:
+    haproxy.org/load-balance: uri
+spec:
+  ports:
+    - name: app
+      protocol: TCP
+      port: 3002
+      targetPort: 3002
+  selector:
+    app: cocreate-api
+  type: ClusterIP
+  sessionAffinity: None
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cocreatecrdtws-haproxy
+  namespace: default
+  labels:
+    app: cocreatecrdtws
+  annotations:
+    haproxy.org/load-balance: uri
+spec:
+  ports:
+    - name: crdt
+      protocol: TCP
+      port: 3001
+      targetPort: 3001
+  selector:
+    app: cocreatecrdtws
+  type: ClusterIP
+  sessionAffinity: None
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cocreatews-haproxy
+  namespace: default
+  labels:
+    app: cocreatews
+  annotations:
+    haproxy.org/load-balance: uri
+spec:
+  ports:
+    - name: app
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+  selector:
+    app: cocreatews
+  type: ClusterIP
+  sessionAffinity: None
+---
+kind: Service
+apiVersion: v1
+metadata:
+  name: cocreatews-haproxy-rr
+  namespace: default
+  labels:
+    app: cocreatews
+  annotations:
+    haproxy.org/load-balance: roundrobin
+spec:
+  ports:
+    - name: app
+      protocol: TCP
+      port: 3000
+      targetPort: 3000
+  selector:
+    app: cocreatews
+  type: ClusterIP
+  sessionAffinity: None
+---
+EOF
+```
+
 ## Define haproxy managed ingresses pointing to apps
 
 ```bash
@@ -251,7 +338,32 @@ metadata:
     app: cocreatews
   annotations:
     haproxy.org/ingress.class: "haproxy"
-    haproxy.org/load-balance: "uri"
+spec:
+  tls:
+    - hosts:
+        - '*.cocreate.app'
+      secretName: cocreate-app
+  rules:
+    - host: '*.cocreate.app'
+      http:
+        paths:
+          - path: /ws
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreatews-haproxy
+                port:
+                  number: 3000
+---
+kind: Ingress
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: cocreatews-haproxy-rr
+  namespace: default
+  labels:
+    app: cocreatews
+  annotations:
+    haproxy.org/ingress.class: "haproxy"
 spec:
   tls:
     - hosts:
@@ -265,7 +377,7 @@ spec:
             pathType: ImplementationSpecific
             backend:
               service:
-                name: cocreatews
+                name: cocreatews-haproxy-rr
                 port:
                   number: 3000
 ---
@@ -278,7 +390,6 @@ metadata:
     app: cocreatecrdtws
   annotations:
     haproxy.org/ingress.class: "haproxy"
-    haproxy.org/load-balance: "uri"
 spec:
   tls:
     - hosts:
@@ -292,7 +403,7 @@ spec:
             pathType: ImplementationSpecific
             backend:
               service:
-                name: cocreatecrdtws
+                name: cocreatecrdtws-haproxy
                 port:
                   number: 3001
 ---
@@ -305,7 +416,6 @@ metadata:
     app: cocreate-api
   annotations:
     haproxy.org/ingress.class: "haproxy"
-    haproxy.org/load-balance: "uri"
 spec:
   tls:
     - hosts:
@@ -319,7 +429,7 @@ spec:
             pathType: ImplementationSpecific
             backend:
               service:
-                name: cocreate-api
+                name: cocreate-api-haproxy
                 port:
                   number: 3002
 ---
@@ -331,6 +441,7 @@ EOF
 ```bash
 # combine files together in order
 cat ns-ingress-haproxy.yaml > haproxy-ingress-manifests.yaml
+cat svc-app.yaml >> haproxy-ingress-manifests.yaml
 cat ing-app.yaml >> haproxy-ingress-manifests.yaml
 cat haproxy-ingress.yaml >> haproxy-ingress-manifests.yaml
 

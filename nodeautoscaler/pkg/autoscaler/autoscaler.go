@@ -188,6 +188,7 @@ func (a *AutoScaler) updateNodes(key string) error {
 		// since now no way to get labels, need to notify all ASG
 		locLog.Info("node does not exist anymore, notify all auto scale group")
 		for _, asg := range a.autoScaleGroups {
+			// TODO: evaluate possibility of blocking
 			select {
 			case asg.nodeUpdateCh <- mcalc.NodeUpdate{Key: key, Node: nil}:
 			case <-a.context.Done():
@@ -209,6 +210,7 @@ func (a *AutoScaler) updateNodes(key string) error {
 			}
 			if match {
 				select {
+				// TODO: evaluate possibility of blocking
 				case asg.nodeUpdateCh <- mcalc.NodeUpdate{Key: key, Node: nodeObj}:
 				case <-a.context.Done():
 				}
@@ -270,7 +272,7 @@ func (a *AutoScaler) genAutoScaleGroup(asgCfg config.AutoScaleGroup) (*autoScale
 		locLog.Error(err, "failed to create metrics source", "metrics source", asgCfg.MetricSource.Type)
 		return nil, err
 	}
-	if asg.provisioner, err = createProvisioner(a.mainConfig, asgCfg); err != nil {
+	if asg.provisioner, err = createProvisioner(a.context, a.mainConfig, asgCfg, a.clientset); err != nil {
 		locLog.Error(err, "failed to create backend provisioner", "backend provisioner", asgCfg.Provisioner.Type)
 		return nil, err
 	}
@@ -327,16 +329,23 @@ func createMetricSource(ctx context.Context, cfg config.Config, asg config.AutoS
 	}
 }
 
-func createProvisioner(cfg config.Config, asg config.AutoScaleGroup) (pv.Provisioner, error) {
+func createProvisioner(pctx context.Context, cfg config.Config, asg config.AutoScaleGroup, kubeclient *kubernetes.Clientset) (pv.Provisioner, error) {
 	switch asg.Provisioner.Type {
 	case pv.ProvisionerRancherNodePool:
-		proCfg := pv.InternalConfig{
-			RancherURL:        cfg.RancherURL,
-			RancherToken:      cfg.RancherToken,
-			RancherNodePoolID: asg.Provisioner.RancherNodePoolID,
-			RancherCA:         cfg.RancherCA,
+		if asg.Provisioner.RancherAnnotationNamespace == "" {
+			return nil, fmt.Errorf("namespace with annotation \"%s\" must be specified", pv.RancherProjAnnotation)
 		}
-		p, err := pv.NewProvisionerRancherNodePool(proCfg)
+		if asg.Provisioner.RancherNodePoolNamePrefix == "" {
+			return nil, fmt.Errorf("name of rancher node pool must be set")
+		}
+		proCfg := pv.InternalConfig{
+			RancherURL:                 cfg.RancherURL,
+			RancherToken:               cfg.RancherToken,
+			RancherAnnotationNamespace: cfg.RancherAnnotationNamespace,
+			RancherNodePoolNamePrefix:  asg.Provisioner.RancherNodePoolNamePrefix,
+			RancherCA:                  cfg.RancherCA,
+		}
+		p, err := pv.NewProvisionerRancherNodePool(pctx, proCfg, kubeclient)
 		if err != nil {
 			return nil, err
 		}

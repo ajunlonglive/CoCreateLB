@@ -6,7 +6,7 @@ autoScaleGroups:
       type: kubernetes
     provisioner:
       type: ranchernodepool
-      rancherNodePoolID: "c-bflfq:np-g6jvt"
+      rancherNodePoolNamePrefix: "worker"
   - name: application
     scaleUpThreshold: "memory=0.7,cpu=0.7"
     labelSelector: "nodeType=application"
@@ -14,4 +14,4 @@ autoScaleGroups:
       type: kubernetes
     provisioner:
       type: ranchernodepool
-      rancherNodePoolID: "c-bflfq:np-7hb6l"
+      rancherNodePoolNamePrefix: "worker"

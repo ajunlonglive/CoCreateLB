@@ -22,14 +22,24 @@
 package provisioner
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/rancher/norman/clientbase"
 	managementClient "github.com/rancher/types/client/management/v3"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+)
+
+const (
+	// RancherProjAnnotation is the annotation including
+	// cluster ID and project ID in a format as "c-xxx:p-xxx"
+	RancherProjAnnotation string = "field.cattle.io/projectId"
 )
 
 // InternalConfig is a config struct used internal
@@ -38,8 +48,11 @@ type InternalConfig struct {
 	RancherURL string
 	// RancherToken is used to access Rancher
 	RancherToken string
-	// RancherNodePoolID is the ID of node pool which is manipulated
-	RancherNodePoolID string
+	// RancherAnnotationNamespace is the name of the namespace
+	// with the annotation "field.cattle.io/projectId"
+	RancherAnnotationNamespace string
+	// RancherNodePoolNamePrefix is the name prefix of node pool which is manipulated
+	RancherNodePoolNamePrefix string
 	// RancherCA is used to verify Rancher server
 	RancherCA string
 }
@@ -57,18 +70,16 @@ type provisionerRancherNodePool struct {
 }
 
 // NewProvisionerRancherNodePool creates a provisionerRancherNodePool
-func NewProvisionerRancherNodePool(cfg InternalConfig) (Provisioner, error) {
-	if cfg.RancherNodePoolID == "" {
-		return nil, fmt.Errorf("rancher node pool ID must be set to use ranchernodepool provisioner")
+func NewProvisionerRancherNodePool(ctx context.Context, cfg InternalConfig, kubeclient *kubernetes.Clientset) (Provisioner, error) {
+	defer klog.Flush()
+	if cfg.RancherAnnotationNamespace == "" || cfg.RancherNodePoolNamePrefix == "" {
+		return nil, fmt.Errorf("both namespace with annotation and node pool name prefix must be set to use ranchernodepool provisioner")
 	}
 
 	p := &provisionerRancherNodePool{
-		rancherURL:        cfg.RancherURL,
-		rancherToken:      cfg.RancherToken,
-		rancherNodePoolID: cfg.RancherNodePoolID,
-		rancherCA:         cfg.RancherCA,
-		logger: logger.WithValues("provisioner", ProvisionerRancherNodePool,
-			"node pool ID", cfg.RancherNodePoolID),
+		rancherURL:   cfg.RancherURL,
+		rancherToken: cfg.RancherToken,
+		rancherCA:    cfg.RancherCA,
 	}
 
 	err := p.createRancherClient()
@@ -76,7 +87,56 @@ func NewProvisionerRancherNodePool(cfg InternalConfig) (Provisioner, error) {
 		return nil, err
 	}
 
+	clusterID, err := getClusterID(ctx, cfg.RancherAnnotationNamespace, kubeclient)
+	if err != nil {
+		return nil, err
+	}
+	logger.Info("find cluster ID", "cluster ID", clusterID)
+
+	nodePoolID := ""
+	// find node pool ID
+	nodePools, err := p.rancherClient.NodePool.ListAll(nil)
+	if err != nil {
+		logger.Error(err, "failed to list node pools in Rancher")
+		return nil, err
+	}
+	for _, np := range nodePools.Data {
+		if np.ClusterID != clusterID {
+			continue
+		}
+		if np.HostnamePrefix == cfg.RancherNodePoolNamePrefix {
+			nodePoolID = np.ID
+			break
+		}
+	}
+	if nodePoolID == "" {
+		err := fmt.Errorf("can not find node pool ID")
+		logger.Error(err, "", "name prefix", cfg.RancherNodePoolNamePrefix)
+		return nil, err
+	}
+	logger.Info("find node pool", "node pool ID", nodePoolID)
+	p.rancherNodePoolID = nodePoolID
+	p.logger = logger.WithValues("provisioner", ProvisionerRancherNodePool, "node pool ID", nodePoolID)
+
 	return p, nil
+}
+
+func getClusterID(pctx context.Context, name string, client *kubernetes.Clientset) (string, error) {
+	ctx, cancel := context.WithTimeout(pctx, 10*time.Second)
+	defer cancel()
+	ns, err := client.CoreV1().Namespaces().Get(ctx, name, metav1.GetOptions{})
+	if err != nil {
+		logger.Error(err, "failed to get namespace", "namespace", name)
+		return "", err
+	}
+	logger.V(5).Info("got annotations", "namespace", name, "annotations", ns.GetAnnotations())
+	if proj, ok := ns.GetAnnotations()[RancherProjAnnotation]; ok {
+		return strings.Split(proj, ":")[0], nil
+	} else {
+		err := fmt.Errorf("failed to get cluster ID from annotation")
+		logger.Error(err, "", "namespace", name, "annotation", RancherProjAnnotation)
+		return "", err
+	}
 }
 
 func (p *provisionerRancherNodePool) createRancherClient() error {
@@ -182,6 +242,23 @@ func (p *provisionerRancherNodePool) ScaleDown(minN int) bool {
 	ret := nodePool.Quantity - 1
 	if ret > 0 {
 		go p.rancherClient.NodePool.Update(nodePool, map[string]int64{"quantity": ret})
+	}
+	return false
+}
+
+func (p *provisionerRancherNodePool) IsManaged(node string) bool {
+	nodes, err := p.rancherClient.Node.ListAll(nil)
+	if err != nil {
+		p.logger.Error(err, "failed to get node list from Rancher")
+		return false
+	}
+	for _, n := range nodes.Data {
+		if n.NodePoolID != p.rancherNodePoolID {
+			continue
+		}
+		if n.NodeName == node {
+			return true
+		}
 	}
 	return false
 }

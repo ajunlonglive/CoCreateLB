@@ -109,11 +109,18 @@ type Provisioner struct {
 	// is triggered due to this parameter
 	MinNodeNum int `mapstructure:"minNodeNum"`
 
-	// RancherNodePoolID is the ID of a node pool in Rancher
+	// RancherAnnotationNamespace is the name of the namespace
+	// with the annotation "field.cattle.io/projectId"
+	// Autoscaler will figure out current cluster ID from this annotation
+	// and find node pools belonging to this cluster
+	// This ensures autoscaler only manage node pools in the local cluster
+	RancherAnnotationNamespace string `mapstructure:"rancherAnnotationNamespace,omitempty"`
+
+	// RancherNodePoolNamePrefix is the name prefix of a node pool in Rancher
 	// Only nodes in this pool and match LabelSelector will be manipulate
 	// Better enable related node labels in node pool level
-	// This is only effect when ranchernodepool is used as backend
-	RancherNodePoolID string `mapstructure:"rancherNodePoolID,omitempty"`
+	// This only effects when ranchernodepool is used as backend
+	RancherNodePoolNamePrefix string `mapstructure:"rancherNodePoolNamePrefix,omitempty"`
 }
 
 // Print prints out parameters in ASG
@@ -132,7 +139,8 @@ func (a *AutoScaleGroup) Print() {
 	fmt.Println("metricCacheExpireTime: ", a.MetricSource.CacheExpireTime)
 	fmt.Println("provisionerType: ", a.Provisioner.Type)
 	if a.Provisioner.Type == pv.ProvisionerRancherNodePool {
-		fmt.Println("rancherNodePoolID: ", a.Provisioner.RancherNodePoolID)
+		fmt.Println("rancherAnnotationNamespace: ", a.Provisioner.RancherAnnotationNamespace)
+		fmt.Println("rancherNodePoolNamePrefix: ", a.Provisioner.RancherNodePoolNamePrefix)
 	}
 	fmt.Println("maxNodeNum: ", a.Provisioner.MaxNodeNum)
 	fmt.Println("minNodeNum: ", a.Provisioner.MinNodeNum)
@@ -176,6 +184,14 @@ func (a *AutoScaleGroup) Merge(cfg Config) {
 	if a.Provisioner.MinNodeNum == 0 {
 		a.Provisioner.MinNodeNum = cfg.MinNodeNum
 	}
+	if a.Provisioner.Type == pv.ProvisionerRancherNodePool {
+		if a.Provisioner.RancherAnnotationNamespace == "" {
+			a.Provisioner.RancherAnnotationNamespace = cfg.RancherAnnotationNamespace
+		}
+		if a.Provisioner.RancherNodePoolNamePrefix == "" {
+			a.Provisioner.RancherNodePoolNamePrefix = cfg.RancherNodePoolNamePrefix
+		}
+	}
 }
 
 // Convert generates an AutoScaleGroup with given name
@@ -192,10 +208,11 @@ func Convert(cfg Config, name string) AutoScaleGroup {
 			CacheExpireTime: cfg.MetricCacheExpireTime,
 		},
 		Provisioner: Provisioner{
-			Type:              cfg.BackendProvsioner,
-			MaxNodeNum:        cfg.MaxNodeNum,
-			MinNodeNum:        cfg.MinNodeNum,
-			RancherNodePoolID: cfg.RancherNodePoolID,
+			Type:                       cfg.BackendProvsioner,
+			MaxNodeNum:                 cfg.MaxNodeNum,
+			MinNodeNum:                 cfg.MinNodeNum,
+			RancherAnnotationNamespace: cfg.RancherAnnotationNamespace,
+			RancherNodePoolNamePrefix:  cfg.RancherNodePoolNamePrefix,
 		},
 		AlarmWindow:       cfg.AlarmWindow,
 		AlarmCoolDown:     cfg.AlarmCoolDown,

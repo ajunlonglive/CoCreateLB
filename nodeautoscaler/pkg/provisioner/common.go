@@ -64,4 +64,7 @@ type Provisioner interface {
 	// caller should not rely on any response
 	// from backend
 	ScaleDown(int) bool
+	// IsManaged checks if the node can be managed by the provisioner
+	// which is given by the node name
+	IsManaged(string) bool
 }

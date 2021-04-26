@@ -266,8 +266,12 @@ func (c *Calculator) updateAvailNodes(nu NodeUpdate) {
 		delete(c.availNodes, nu.Key)
 	}
 	if addNode {
-		locLog.Info("add new avaialbe node into metrics calculation")
-		c.availNodes[nu.Key] = nu.Node
+		if c.provisioner.IsManaged(nu.Key) {
+			locLog.Info("add new avaialbe node into metrics calculation")
+			c.availNodes[nu.Key] = nu.Node
+		} else {
+			locLog.Info("node is not managed by related provisioner")
+		}
 	}
 
 }

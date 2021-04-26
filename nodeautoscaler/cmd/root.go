@@ -192,9 +192,13 @@ func setConfigFlags() {
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherURL, "rancher-url", mainConfig.RancherURL, "URL of Rancher to access if use Rancher as backend provisioner")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherToken, "rancher-token", mainConfig.RancherToken,
 		"Token used to access Rancher if use Rancher as backend provisioner")
-	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherNodePoolID, "rancher-node-pool-id", mainConfig.RancherNodePoolID,
-		"ID of node pool in Rancher when backend-provisioner is set to ranchernodepool. Scaler will only manipulate nodes which are both in this pool "+
-			"and match the label-selector. It's better to set related node labels at node pool level")
+	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherAnnotationNamespace, "rancher-annotation-namespace", mainConfig.RancherAnnotationNamespace,
+		"The name of the namespace with the annotation \""+provisioner.RancherProjAnnotation+"\" from which cluster ID is derived. "+
+			"This means that autoscaler only lookups node pools in local cluster when \"ranchernodepool\" is used as the backend.")
+	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherNodePoolNamePrefix, "rancher-node-pool-name-prefix", mainConfig.RancherNodePoolNamePrefix,
+		"The name prefix of the node pool in Rancher. Only nodes in this pool matching \"label-selector\" will be managed. "+
+			"This only effects when \"ranchernodepool\" is used as the backend. This will be ignored if \"auto-scale-group-config\" is set"+
+			"This means that autoscaler only lookups node pools in local cluster when ranchernodepool is used as the backend.")
 	rootCmd.PersistentFlags().StringVar(&mainConfig.RancherCA, "rancher-ca", mainConfig.RancherCA, "Path to a CA to verify Rancher server, "+
 		"insecure connection will be used if set to empty")
 	rootCmd.PersistentFlags().IntVar(&mainConfig.MaxNodeNum, "max-node-num", mainConfig.MaxNodeNum,

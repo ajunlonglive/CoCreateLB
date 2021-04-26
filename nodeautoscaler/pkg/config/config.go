@@ -118,11 +118,18 @@ type Config struct {
 	// BackendProvsioner indicates the type of backend used to provision nodes
 	BackendProvsioner pv.ProvisionerT
 
-	// RancherNodePoolID is the ID of a node pool in Rancher
+	// RancherAnnotationNamespace is the name of the namespace
+	// with the annotation "field.cattle.io/projectId"
+	// Autoscaler will figure out current cluster ID from this annotation
+	// and find node pools belonging to this cluster
+	// This ensures autoscaler only manage node pools in the local cluster
+	RancherAnnotationNamespace string
+
+	// RancherNodePoolNamePrefix is the name prefix of a node pool in Rancher
 	// Only nodes in this pool and match LabelSelector will be manipulate
 	// Better enable related node labels in node pool level
-	// This is only effect when ranchernodepool is used as backend
-	RancherNodePoolID string
+	// This only effects when ranchernodepool is used as backend
+	RancherNodePoolNamePrefix string
 
 	// MaxNodeNum denotes at most how many nodes can exist
 	// after scaling up.
@@ -166,4 +173,5 @@ func Default(cfg *Config) {
 	cfg.BackendProvsioner = defaultProvisioner
 	cfg.MaxNodeNum = 8
 	cfg.MinNodeNum = 2
+	cfg.RancherAnnotationNamespace = "cattle-system"
 }

@@ -52,3 +52,7 @@ func (p *provisionerFake) ScaleDown(minNum int) bool {
 	p.logger.Info("received scale down request", "min number", minNum)
 	return false
 }
+
+func (p *provisionerFake) IsManaged(node string) bool {
+	return true
+}

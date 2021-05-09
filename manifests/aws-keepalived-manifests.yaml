@@ -1,24 +1,14 @@
 ---
 apiVersion: v1
 data:
-  AWS_ACCESS_KEY_ID: QUtJQVpLRVRKNVBTNTZSV09WNTc=
-  AWS_SECRET_ACCESS_KEY: NXcxZUJ4R2xKUjVIZ2ZMakJLeVVsV2kxWk1zdWw0ZnRCZW1WVW9sTQ==
-kind: Secret
-metadata:
-  creationTimestamp: null
-  name: aws-keepalived-keys
-  namespace: ingress-haproxy
----
-apiVersion: v1
-data:
   # IPs of all keepalived instances in same cluster
-  all_peers_ip: 172.31.38.35,172.31.36.21
+  all_peers_ip: {{ ALL_PPERS_IP }}
   # allocation id of elastic IP
-  allocation_id: eipalloc-0045bfe39c670b940
+  allocation_id: {{ EIP_ALLOC_ID }}
   # default targeting aws region
-  aws_default_region: us-east-1
+  aws_default_region: {{ AWS_DEFAULT_REGION }}
   # primary nic name on the host running keepalived
-  primary_nic: ens5
+  primary_nic: {{ PRIMARY_NIC_NAME }}
 kind: ConfigMap
 metadata:
   creationTimestamp: null

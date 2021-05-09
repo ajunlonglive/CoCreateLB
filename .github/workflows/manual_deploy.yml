@@ -142,9 +142,9 @@ jobs:
           echo
           RANCHER_URL=${ENV_RANCHER_URL}
         fi
-        ENCODE_URL=$(echo ${RANCHER_URL} | base64 | tr -d '\n')
+        ENCODE_URL=$(echo ${RANCHER_URL} | tr -d '\n' | base64 | tr -d '\n')
         sed -i "s/{{ RANCHER_URL }}/${ENCODE_URL}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
-        ENCODE_TOKEN=$(echo ${RANCHER_TOKEN} | base64 | tr -d '\n')
+        ENCODE_TOKEN=$(echo ${RANCHER_TOKEN} | tr -d '\n' | base64 | tr -d '\n')
         sed -i "s/{{ RANCHER_TOKEN }}/${ENCODE_TOKEN}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
         if [ "$DRY_RUN" == 'yes' ]
         then
@@ -182,9 +182,9 @@ jobs:
         AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
       if: ${{ contains(github.event.inputs.deploy_components, 'keepalived') }}
       run: |
-        ENCODE_ID=$(echo ${AWS_ACCESS_KEY_ID} | base64 | tr -d '\n')
+        ENCODE_ID=$(echo ${AWS_ACCESS_KEY_ID} | tr -d '\n' | base64 | tr -d '\n')
         sed -i "s/{{ AWS_ACCESS_KEY_ID }}/${ENCODE_ID}/g" ${GITHUB_WORKSPACE}/manifests/aws-secret.yaml
-        ENCODE_KEY=$(echo ${AWS_SECRET_ACCESS_KEY} | base64 | tr -d '\n')
+        ENCODE_KEY=$(echo ${AWS_SECRET_ACCESS_KEY} | tr -d '\n' | base64 | tr -d '\n')
         sed -i "s/{{ AWS_SECRET_ACCESS_KEY }}/${ENCODE_KEY}/g" ${GITHUB_WORKSPACE}/manifests/aws-secret.yaml
         if [ "$DRY_RUN" == 'yes' ]
         then

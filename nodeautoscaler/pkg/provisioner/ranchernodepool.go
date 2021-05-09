@@ -142,13 +142,13 @@ func getClusterID(pctx context.Context, name string, client *kubernetes.Clientse
 func (p *provisionerRancherNodePool) createRancherClient() error {
 	opts, err := p.createClientOpts()
 	if err != nil {
-		p.logger.Error(err, "failed to create Rancher client options")
+		logger.Error(err, "failed to create Rancher client options")
 		return err
 	}
 
 	mClient, err := managementClient.NewClient(opts)
 	if err != nil {
-		p.logger.Error(err, "failed to create Rancher client")
+		logger.Error(err, "failed to create Rancher client")
 		return err
 	}
 

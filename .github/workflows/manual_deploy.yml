@@ -145,7 +145,6 @@ jobs:
         ENCODE_URL=$(echo ${RANCHER_URL} | base64 | tr -d '\n')
         sed -i "s/{{ RANCHER_URL }}/${ENCODE_URL}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
         ENCODE_TOKEN=$(echo ${RANCHER_TOKEN} | base64 | tr -d '\n')
-        echo $ENCODE_TOKEN
         sed -i "s/{{ RANCHER_TOKEN }}/${ENCODE_TOKEN}/g" ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/rancher-secret.yaml
         if [ "$DRY_RUN" == 'yes' ]
         then
@@ -174,7 +173,8 @@ jobs:
           echo
           echo "********** Deploy node auto scaler ************"
           echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/node-auto-scaler-manifests.yaml -o yaml
+          kubectl apply -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/node-auto-scaler-manifests.yaml -o yaml
+          kubectl rollout restart -f ${GITHUB_WORKSPACE}/nodeautoscaler/deploy/node-auto-scaler-manifests.yaml
         fi
     - name: Deploy aws secret
       env:
@@ -240,7 +240,8 @@ jobs:
           echo
           echo "********** Deploy keepalived ************"
           echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml -o yaml
+          kubectl apply -f ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml -o yaml
+          kubectl rollout restart -f ${GITHUB_WORKSPACE}/manifests/aws-keepalived-manifests.yaml
         fi
     - name: Deploy LB
       if: ${{ contains(github.event.inputs.deploy_components, 'lb') }}
@@ -255,5 +256,6 @@ jobs:
           echo
           echo "********** Deploy keepalived ************"
           echo
-          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml -o yaml
+          kubectl apply -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml -o yaml
+          kubectl rollout restart -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml
         fi

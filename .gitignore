@@ -1,2 +1,5 @@
 # ignore
 node_modules
+
+nodeautoscaler/.devcontainer/
+nodeautoscaler/bin/

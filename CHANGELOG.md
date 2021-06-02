@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.0...v1.0.1) (2021-03-07)
+
+
+### Bug Fixes
+
+* **automation:** add full ci/cd workflow ([141af60](https://github.com/CoCreate-app/CoCreate-loadbalancer/commit/141af602015c9fa74148c34c67ea1280d59ed6c2))
+
 # 1.0.0 (2021-03-03)
 
 

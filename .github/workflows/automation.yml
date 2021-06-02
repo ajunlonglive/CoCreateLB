@@ -1,30 +1,33 @@
-name: CI
+name: CI/CD
 
 on:
   push:
     branches:
-    - master
-  pull_request:
-    branches:
-    - master
-  create:
-    branches:
-    - master
+      - master
 
 jobs:
-  updateKeyword:
+  about:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-          
+
       - name: Jaid/action-sync-node-meta
         uses: jaid/action-sync-node-meta@v1.4.0
         with:
           direction: overwrite-github # default is overwrite-file
           githubToken: ${{ secrets.GITHUB }}
-  
-  ci:
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: update documentation
+        uses: CoCreate-app/CoCreate-docs@master
+
+  release:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -32,6 +35,7 @@ jobs:
 
       - name: Semantic Release
         uses: cycjimmy/semantic-release-action@v2
+        id: semantic
         with:
           # You can specify specifying version range for the extra plugins if you prefer.
           extra_plugins: |
@@ -41,14 +45,34 @@ jobs:
             @semantic-release/github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB }}
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}  # Auto Changlog generator
-           
-  docs:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }} # Auto Changog generator
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+
+  deploy:
     runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ needs.release.outputs.new_release_version }}
+      KUBECONFIG_FILE: ${{ secrets.KUBECONFIG }}
+      KUBECONFIG: kubeconfig
     steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-      
-      - name: update documentation
-        uses: CoCreate-app/CoCreate-docs@master
-          
+      - name: Checkout repository
+        uses: actions/checkout@v1
+
+      - name: Get kubectl
+        run: |
+          curl -LO https://dl.k8s.io/release/v1.20.0/bin/linux/amd64/kubectl
+          chmod +x kubectl
+
+      - name: Save kubeconfig
+        env:
+          KUBECONFIG_FILE: ${{ secrets.KUBECONFIG }}
+        run: |
+          echo ${KUBECONFIG_FILE} | base64 -d  > ${KUBECONFIG}
+
+      - name: Apply deployment
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB }}
+        run: |
+          ./kubectl apply -f manifests/haproxy-ingress-manifests.yaml

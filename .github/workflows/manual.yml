@@ -1,0 +1,65 @@
+# This is a workflow that is manually triggered to deploy supported components other than applications
+
+name: Manual Deployment
+
+# Controls when the action will run. Workflow runs when manually triggered using the UI
+# or API.
+on:
+  workflow_dispatch:
+    # Inputs the workflow accepts.
+    inputs:
+      dry_run:
+        description: |
+          If set to 'yes', run all deployment in dry-run mode.
+          Otherwise, set to 'no'.
+        default: 'yes'
+        required: true
+      kubectl_version:
+        description: 'Version of kubectl to be installed'
+        default: '1.19.9'
+        required: true
+
+    
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  # Deploy components
+  deploy:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+    # Environment variables
+    env:
+      DRY_RUN: ${{ github.event.inputs.dry_run }}
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+    - name: Setup kubectl with empty input kubeconfig
+      uses: ThomasKliszowski/setup-kubectl@v1
+      with:
+        # Base64 encoded kube config
+        kube-config: ${{ secrets.KUBECONFIG }}
+        # Kube version used to download kubectl executable, defaults to latest
+        kube-version: ${{ github.event.inputs.kubectl_version }}
+    # Check installed kubectl
+    - name: Check installed kubectl
+      run: |
+        kubectl version
+    # Check configured kubeconfig
+    - name: Check and persist kubeconfig
+      id: step_kubeconfig
+      run: |
+        kubectl config view
+    - name: Deploy LB
+      if: ${{ contains(github.event.inputs.deploy_components, 'lb') }}
+      run: |
+        if [ "$DRY_RUN" == 'yes' ]
+        then
+          echo
+          echo "********** Deploy keepalived in dry-run mode ************"
+          echo
+          kubectl replace -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml --dry-run=client -o yaml
+        else
+          echo
+          echo "********** Deploy keepalived ************"
+          echo
+          kubectl apply -f ${GITHUB_WORKSPACE}/manifests/haproxy-ingress-manifests.yaml -o yaml
+          kubectl -n ingress-haproxy rollout restart ds haproxy-ingress-kubernetes-ingress
+        fi

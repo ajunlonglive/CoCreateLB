@@ -1,3 +1,10 @@
+## [1.0.4](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.3...v1.0.4) (2021-09-14)
+
+
+### Bug Fixes
+
+* add regex for wildcard host ([dda9e05](https://github.com/CoCreate-app/CoCreate-loadbalancer/commit/dda9e052a34b9402b98ba556d742f36c3dc64d21))
+
 ## [1.0.3](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.2...v1.0.3) (2021-09-14)
 
 

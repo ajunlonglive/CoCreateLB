@@ -1,3 +1,11 @@
+## [1.0.2](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.1...v1.0.2) (2021-09-14)
+
+
+### Bug Fixes
+
+* add host cocreate.app ([4694276](https://github.com/CoCreate-app/CoCreate-loadbalancer/commit/4694276a8d7234ac59818d27c20b66519b0013e8))
+* removed data- from crud, fetch, filter and pass attributes ([7987546](https://github.com/CoCreate-app/CoCreate-loadbalancer/commit/798754690a12910f879969a79841ac8251b90690))
+
 ## [1.0.1](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.0...v1.0.1) (2021-03-07)
 
 

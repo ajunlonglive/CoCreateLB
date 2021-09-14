@@ -154,11 +154,11 @@ spec:
     - host: 'cocreate.app'
       http:
         paths:
-          - path: /ws
+          - path: /
             pathType: ImplementationSpecific
             backend:
               service:
-                name: cocreatews-haproxy
+                name: cocreatews-haproxy-rr
                 port:
                   number: 3000
 
@@ -192,13 +192,13 @@ spec:
     - host: 'cocreate.app'
       http:
         paths:
-          - path: /ws
+          - path: /crdt
             pathType: ImplementationSpecific
             backend:
               service:
-                name: cocreatews-haproxy
+                name: cocreatecrdtws-haproxy
                 port:
-                  number: 3000
+                  number: 3001
 
 ---
 kind: Ingress

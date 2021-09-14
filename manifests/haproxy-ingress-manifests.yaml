@@ -101,9 +101,12 @@ spec:
   tls:
     - hosts:
         - '*.cocreate.app'
+        - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*.cocreate.app'
+    - hosts:
+        - '*.cocreate.app'
+        - 'cocreate.app'
       http:
         paths:
           - path: /ws
@@ -127,9 +130,12 @@ spec:
   tls:
     - hosts:
         - '*.cocreate.app'
+        - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*.cocreate.app'
+    - hosts:
+        - '*.cocreate.app'
+        - 'cocreate.app'
       http:
         paths:
           - path: /
@@ -153,9 +159,12 @@ spec:
   tls:
     - hosts:
         - '*.cocreate.app'
+        - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*.cocreate.app'
+    - hosts:
+        - '*.cocreate.app'
+        - 'cocreate.app'
       http:
         paths:
           - path: /crdt
@@ -179,9 +188,12 @@ spec:
   tls:
     - hosts:
         - '*.cocreate.app'
+        - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*.cocreate.app'
+    - hosts:
+        - '*.cocreate.app'
+        - 'cocreate.app'
       http:
         paths:
           - path: /api

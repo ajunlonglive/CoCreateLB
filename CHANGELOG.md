@@ -1,3 +1,10 @@
+## [1.0.3](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.2...v1.0.3) (2021-09-14)
+
+
+### Bug Fixes
+
+* add host cocreate.app ([791c259](https://github.com/CoCreate-app/CoCreate-loadbalancer/commit/791c2594257dd9c2999555f7551ee6afaf6fee20))
+
 ## [1.0.2](https://github.com/CoCreate-app/CoCreate-loadbalancer/compare/v1.0.1...v1.0.2) (2021-09-14)
 
 

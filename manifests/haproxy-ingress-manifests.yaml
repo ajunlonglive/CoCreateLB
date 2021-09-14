@@ -104,7 +104,17 @@ spec:
         - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    - host: '*.cocreate.app'
+      http:
+        paths:
+          - path: /ws
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreatews-haproxy
+                port:
+                  number: 3000
+    - host: 'cocreate.app'
       http:
         paths:
           - path: /ws
@@ -131,7 +141,7 @@ spec:
         - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    - host: '*.cocreate.app'
       http:
         paths:
           - path: /
@@ -141,6 +151,17 @@ spec:
                 name: cocreatews-haproxy-rr
                 port:
                   number: 3000
+    - host: 'cocreate.app'
+      http:
+        paths:
+          - path: /ws
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreatews-haproxy
+                port:
+                  number: 3000
+
 ---
 kind: Ingress
 apiVersion: networking.k8s.io/v1
@@ -158,7 +179,7 @@ spec:
         - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    - host: '*.cocreate.app'
       http:
         paths:
           - path: /crdt
@@ -168,6 +189,17 @@ spec:
                 name: cocreatecrdtws-haproxy
                 port:
                   number: 3001
+    - host: 'cocreate.app'
+      http:
+        paths:
+          - path: /ws
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreatews-haproxy
+                port:
+                  number: 3000
+
 ---
 kind: Ingress
 apiVersion: networking.k8s.io/v1
@@ -185,7 +217,17 @@ spec:
         - 'cocreate.app'
       secretName: cocreate-app
   rules:
-    - host: '*\.[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*'
+    - host: '*.cocreate.app'
+      http:
+        paths:
+          - path: /api
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: cocreate-api-haproxy
+                port:
+                  number: 3002
+    - host: 'cocreate.app'
       http:
         paths:
           - path: /api

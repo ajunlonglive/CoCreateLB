@@ -1,10 +1,10 @@
-# CoCreate-loadbalancer
+# CoCreateLB
 A simple loadbalancer component in vanilla javascript. Easily configured using HTML5 data-attributes and/or JavaScript API. Take it for a spin in our [playground!](https://cocreate.app/docs/loadbalancer)
 
-![GitHub file size in bytes](https://img.shields.io/github/size/CoCreate-app/CoCreate-loadbalancer/dist/CoCreate-loadbalancer.min.js?label=minified%20size&style=for-the-badge) 
-![GitHub latest release](https://img.shields.io/github/v/release/CoCreate-app/CoCreate-loadbalancer?style=for-the-badge)
-![GitHub](https://img.shields.io/github/license/CoCreate-app/CoCreate-loadbalancer?style=for-the-badge) 
-![GitHub labels](https://img.shields.io/github/labels/CoCreate-app/CoCreate-loadbalancer/help%20wanted?style=for-the-badge)
+![GitHub latest release](https://img.shields.io/github/v/release/CoCreate-app/CoCreateLB?style=flat-square)
+![GitHub contributors](https://img.shields.io/github/contributors/CoCreate-app/CoCreateLB?style=flat-square)
+![License](https://img.shields.io/static/v1?style=flat-square&label=license&message=SSPL&color=green)
+![Hiring](https://img.shields.io/static/v1?style=flat-square&label=&message=Hiring&color=blueviolet)
 
 ![CoCreate](https://cdn.cocreate.app/logo.png)
 
@@ -27,28 +27,41 @@ We appreciate your continued support, thank you!
 <a name="announcements"></a>
 # Announcements
 
-All updates to this library are documented in our [CHANGELOG](https://github.com/CoCreate-app/CoCreate-loadbalancer/blob/master/CHANGELOG.md) and [releases](https://github.com/CoCreate-app/CoCreate-loadbalancer/releases). You may also subscribe to email for releases and breaking changes. 
+All updates to this library are documented in our [CHANGELOG](https://github.com/CoCreate-app/CoCreateLB/blob/master/CHANGELOG.md) and [releases](https://github.com/CoCreate-app/CoCreateLB/releases). You may also subscribe to email for releases and breaking changes. 
 
 <a name="roadmap"></a>
 # Roadmap
 
-If you are interested in the future direction of this project, please take a look at our open [issues](https://github.com/CoCreate-app/CoCreate-loadbalancer/issues) and [pull requests](https://github.com/CoCreate-app/CoCreate-loadbalancer/pulls). We would love to hear your feedback.
+If you are interested in the future direction of this project, please take a look at our open [issues](https://github.com/CoCreate-app/CoCreateLB/issues) and [pull requests](https://github.com/CoCreate-app/CoCreateLB/pulls). We would love to hear your feedback.
 
 
 <a name="about"></a>
 # About
 
-CoCreate-loadbalancer is guided and supported by the CoCreate Developer Experience Team.
+CoCreateLB is guided and supported by the CoCreate Developer Experience Team.
 
 Please Email the Developer Experience Team [here](mailto:develop@cocreate.app) in case of any queries.
 
-CoCreate-loadbalancer is maintained and funded by CoCreate. The names and logos for CoCreate are trademarks of CoCreate, LLC.
+CoCreateLB is maintained and funded by CoCreate. The names and logos for CoCreate are trademarks of CoCreate, LLC.
 
 <a name="contribute"></a>
 # How to Contribute
 
-We encourage contribution to our libraries (you might even score some nifty swag), please see our [CONTRIBUTING](https://github.com/CoCreate-app/CoCreate-loadbalancer/blob/master/CONTRIBUTING.md) guide for details.
+We encourage contribution to our libraries (you might even score some nifty swag), please see our [CONTRIBUTING](https://github.com/CoCreate-app/CoCreateLB/blob/master/CONTRIBUTING.md) guide for details.
 
-# License
-[The MIT License (MIT)](https://github.com/CoCreate-app/CoCreate-loadbalancer/blob/master/LICENSE)
+<a name="license"></a>
+# Dual License
+## Open Source
+[Server Side Public License (SSPL)](https://github.com/CoCreate-app/CoCreateLB/blob/master/LICENSE)
 
+## Commercial
+For-profit companies and individuals intending to use CoCreateLB for 
+commercial use must purchase a commercial license. This license allows 
+source code modifications, but does not permit redistribution of 
+modifications.
+
+The commercial license is designed for you to use CoCreateLB in commercial 
+products and applications, without the provisions of the SSPL. With the 
+commercial license, your code is kept propietary, to yourself. If you 
+want to use CoCreateLB to develop commercial sites, themes, projects, and 
+applications, the commercial license is the appropriate license.

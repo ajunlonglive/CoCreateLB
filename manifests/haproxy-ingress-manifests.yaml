@@ -30,26 +30,6 @@ spec:
 kind: Service
 apiVersion: v1
 metadata:
-  name: cocreatecrdtws-haproxy
-  namespace: default
-  labels:
-    app: cocreatecrdtws
-  annotations:
-    haproxy.org/load-balance: uri
-spec:
-  ports:
-    - name: crdt
-      protocol: TCP
-      port: 3001
-      targetPort: 3001
-  selector:
-    app: cocreatecrdtws
-  type: ClusterIP
-  sessionAffinity: None
----
-kind: Service
-apiVersion: v1
-metadata:
   name: cocreatews-haproxy
   namespace: default
   labels:
@@ -161,44 +141,6 @@ spec:
                 name: cocreatews-haproxy-rr
                 port:
                   number: 3000
-
----
-kind: Ingress
-apiVersion: networking.k8s.io/v1
-metadata:
-  name: cocreatecrdtws-haproxy
-  namespace: default
-  labels:
-    app: cocreatecrdtws
-  annotations:
-    haproxy.org/ingress.class: "haproxy"
-spec:
-  tls:
-    - hosts:
-        - '*.cocreate.app'
-        - 'cocreate.app'
-      secretName: cocreate-app
-  rules:
-    - host: '*.cocreate.app'
-      http:
-        paths:
-          - path: /crdt
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: cocreatecrdtws-haproxy
-                port:
-                  number: 3001
-    - host: 'cocreate.app'
-      http:
-        paths:
-          - path: /crdt
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: cocreatecrdtws-haproxy
-                port:
-                  number: 3001
 
 ---
 kind: Ingress

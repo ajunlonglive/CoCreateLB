@@ -52,7 +52,6 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      VERSION: ${{ needs.release.outputs.new_release_version }}
       KUBECONFIG_FILE: ${{ secrets.KUBECONFIG }}
       KUBECONFIG: kubeconfig
     steps:

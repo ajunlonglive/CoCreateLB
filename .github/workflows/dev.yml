@@ -8,8 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    needs:
-      - package
     env:
       VERSION: dev
       KUBECONFIG_FILE: ${{ secrets.KUBECONFIG_DEV }}
